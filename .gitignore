@@ -1,0 +1,12 @@
+.venv/
+.venv-validation/
+__pycache__/
+*.pyc
+.env
+/output/
+testdata/
+.pytest_cache/
+app/database/
+media/
+vector_db/
+.cache/

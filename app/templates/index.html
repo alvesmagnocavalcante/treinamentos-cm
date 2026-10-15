@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="mb-4">Treinamentos</h1>
+{% for setor in setores %}
+<section class="mb-4">
+  <h2 class="h4">{{ setor.nome }}</h2>
+  <p>{{ setor.descricao }}</p>
+  <div class="list-group">
+    {% for treinamento in setor.treinamentos | selectattr('ativo') | sort(attribute='titulo') %}
+    <a class="list-group-item list-group-item-action" href="/treinamentos/{{ treinamento.id }}">
+      <strong>{{ treinamento.titulo }}</strong>
+      <span class="d-block text-muted">{{ treinamento.descricao }}</span>
+    </a>
+    {% else %}<p class="text-muted">Nenhum treinamento ativo neste setor.</p>{% endfor %}
+  </div>
+</section>
+{% else %}
+<p>Nenhum setor cadastrado. <a href="/admin">Cadastre um setor e seu primeiro treinamento.</a></p>
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}{{ treinamento.titulo }} · Treinamento interno{% endblock %}
+{% block content %}
+<p class="text-muted">{{ treinamento.setor.nome }}</p>
+<h1>{{ treinamento.titulo }}</h1>
+<p>{{ treinamento.descricao }}</p>
+{% if treinamento.conteudo %}<section class="card card-body mb-4 training-content">{{ treinamento.conteudo }}</section>{% endif %}
+<h2 class="h4">Documentos</h2>
+<ul>
+{% for documento in treinamento.documentos %}
+  <li><a href="/documentos/{{ documento.id }}/arquivo">{{ documento.nome }}</a> — {{ 'Processado' if documento.processado else 'Pendente de processamento' }}</li>
+{% else %}<li>Nenhum documento cadastrado.</li>{% endfor %}
+</ul>
+<p><a href="/admin/treinamentos/{{ treinamento.id }}/documentos">Gerenciar documentos</a></p>
+<section class="card card-body mt-4" aria-labelledby="assistant-title">
+  <div class="d-flex justify-content-between align-items-center gap-3">
+    <h2 class="h4" id="assistant-title">Assistente de treinamento</h2>
+    <button id="clear-chat" type="button" class="btn btn-sm btn-outline-secondary">Limpar conversa</button>
+  </div>
+  <p class="text-muted small">Respostas baseadas nos documentos indexados deste treinamento. Confira os trechos nas fontes.</p>
+  <div id="chat-history" class="chat-history mb-3" role="log" aria-live="polite"></div>
+  <form id="chat-form" data-training-id="{{ treinamento.id }}">
+    <label for="pergunta" class="form-label">Sua pergunta</label>
+    <textarea id="pergunta" name="pergunta" class="form-control mb-2" rows="2" maxlength="2000" required></textarea>
+    <button class="btn btn-dark" type="submit">Enviar pergunta</button>
+    <span id="chat-status" class="small ms-2" role="status"></span>
+  </form>
+</section>
+<script src="{{ url_for('static', path='/chat.js') }}" defer></script>
+{% endblock %}
