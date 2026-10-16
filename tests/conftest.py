@@ -1,5 +1,6 @@
 import httpx
 import pytest
+import requests
 
 from app.config import Settings
 
@@ -10,6 +11,7 @@ def prevent_paid_http_calls(monkeypatch):
         raise AssertionError("Rede externa bloqueada nos testes; utilize httpx.MockTransport.")
 
     monkeypatch.setattr(httpx.HTTPTransport, "handle_request", blocked)
+    monkeypatch.setattr(requests.sessions.Session, "request", blocked)
 
 
 @pytest.fixture

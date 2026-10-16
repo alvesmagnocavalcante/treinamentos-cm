@@ -3,6 +3,7 @@ from django.db import models
 from django.utils import timezone
 
 from app.services.errors import ServiceError
+from app.services.drive import normalize_folder_url
 from app.services.video import normalize_video_url
 
 
@@ -29,6 +30,8 @@ class Treinamento(models.Model):
     titulo = models.CharField("título", max_length=200)
     descricao = models.TextField("descrição", blank=True, max_length=5000)
     ativo = models.BooleanField(default=True)
+    drive_folder_url = models.URLField("pasta de documentos no Google Drive", max_length=2048, blank=True,
+                                      help_text="Pasta compartilhada com a conta de serviço. Sincronize em Gerenciar documentos.")
 
     class Meta:
         ordering = ["titulo"]
@@ -38,6 +41,10 @@ class Treinamento(models.Model):
         self.titulo = self.titulo.strip()
         if not self.titulo:
             raise ValidationError({"titulo": "Informe o título do treinamento."})
+        try:
+            self.drive_folder_url = normalize_folder_url(self.drive_folder_url)
+        except ServiceError as exc:
+            raise ValidationError({"drive_folder_url": str(exc)}) from None
 
     def __str__(self):
         return self.titulo
@@ -78,11 +85,17 @@ class Documento(models.Model):
     caminho = models.CharField(max_length=255)
     tipo = models.CharField(max_length=4, choices=[("pdf", "PDF"), ("docx", "DOCX")])
     processado = models.BooleanField("indexado", default=False)
+    drive_file_id = models.CharField(max_length=200, blank=True, editable=False)
+    drive_version = models.CharField(max_length=40, blank=True, editable=False)
     criado_em = models.DateTimeField(default=timezone.now, editable=False)
 
     class Meta:
         ordering = ["pk"]
-        constraints = [models.CheckConstraint(condition=models.Q(tipo__in=["pdf", "docx"]), name="documento_tipo_suportado")]
+        constraints = [
+            models.CheckConstraint(condition=models.Q(tipo__in=["pdf", "docx"]), name="documento_tipo_suportado"),
+            models.UniqueConstraint(fields=["treinamento", "drive_file_id"], condition=~models.Q(drive_file_id=""),
+                                    name="documento_drive_por_treinamento"),
+        ]
 
     def __str__(self):
         return self.nome

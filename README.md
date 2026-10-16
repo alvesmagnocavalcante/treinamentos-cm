@@ -73,6 +73,55 @@ Em desenvolvimento, se `DJANGO_SECRET_KEY` estiver vazio, uma chave aleatória
 persistente é criada em `.cache/django-secret`, ignorada pelo Git. Fora do
 ambiente local, configure explicitamente a chave, os hosts permitidos e HTTPS.
 
+## Documentos do Google Drive
+
+Em **Administração → Treinamentos → Gerenciar documentos**, informe o link da
+pasta e clique em **Sincronizar e indexar**. A pasta fica vinculada ao treinamento.
+Também é possível configurá-la ao editar o treinamento no Django Admin.
+
+Antes da primeira sincronização:
+
+1. Habilite a **Google Drive API** no projeto Google Cloud.
+2. Crie uma conta de serviço e compartilhe a pasta do Drive com o e-mail dessa
+   conta, com permissão de **Leitor**. Os arquivos não precisam ser públicos.
+3. Para execução local, guarde o JSON da conta de serviço em um local seguro
+   (por exemplo, `.secrets/google-drive.json`, ignorado pelo Git) e configure
+   `GOOGLE_APPLICATION_CREDENTIALS` no `.env` com o caminho absoluto do arquivo.
+   Não envie o JSON pelo navegador nem o inclua no repositório. A chave
+   `GOOGLE_API_KEY` dos embeddings não substitui essa credencial.
+4. Execute `uv sync --locked`, `uv run python manage.py migrate` e reinicie o
+   servidor após configurar a credencial.
+
+A integração utiliza as credenciais padrão do Google (ADC), com escopo
+`drive.readonly`. A identidade precisa estar autorizada a ler o Drive; no GCP,
+configure essa identidade/credencial no ambiente, sem empacotar chaves na imagem.
+
+São importados PDF, DOCX e documentos nativos do Google Docs (exportados em DOCX).
+São aceitos até 100 documentos diretamente na pasta, incluindo pastas de drives
+compartilhados, respeitando o limite `MAX_UPLOAD_MB` por arquivo. Subpastas,
+atalhos, planilhas e apresentações não são importados. PDFs digitalizados
+continuam exigindo OCR prévio.
+
+A sincronização é manual. Repita após editar os arquivos: somente documentos
+novos, alterados, pendentes ou sem cópia local são baixados e indexados. O mesmo
+arquivo não duplica registros no treinamento. Uma falha pode deixar os arquivos
+já importados disponíveis e o documento com erro pendente; corrija a causa e
+sincronize novamente para retomar. O texto extraído é enviado ao provedor de
+embeddings, como ocorre no upload.
+
+Remover um arquivo do Drive ou trocar a pasta não exclui documentos importados:
+use **Excluir** na administração para retirar o documento e seus vetores. O botão
+**Reindexar** continua processando a cópia local; para buscar a versão mais recente
+da origem, use **Sincronizar e indexar**. Nenhum arquivo ou permissão é alterado
+no Drive.
+
+Os arquivos baixados continuam em `DOCUMENTS_PATH`, os vetores no Chroma local e
+os dados no SQLite. Esta integração não modifica a persistência para Cloud Run.
+
+Referências: [listagem de arquivos](https://developers.google.com/workspace/drive/api/reference/rest/v3/files/list),
+[download e exportação](https://developers.google.com/workspace/drive/api/guides/manage-downloads)
+e [credenciais ADC](https://google-auth.readthedocs.io/en/latest/reference/google.auth.html).
+
 ## Importar dados da versão anterior
 
 O banco Django padrão é `app/database/platform.sqlite3`. O SQLite anterior,

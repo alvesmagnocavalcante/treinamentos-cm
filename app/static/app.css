@@ -246,10 +246,10 @@
 }
 
 .platform-page { --bs-body-bg: var(--surface); --bs-body-color: var(--ink); --bs-border-color: var(--line); --bs-tertiary-bg: var(--surface-muted); --bs-secondary-bg: var(--surface-muted); --bs-secondary-color: var(--muted); --bs-emphasis-color: var(--ink); margin: 0; background: var(--page); color: var(--ink); font-family: var(--font-body); }
-.platform-page .navbar { background: var(--accent) !important; }
+.platform-page .navbar { background: #4c3427 !important; }
 .platform-page a:not(.btn) { color: var(--accent); }
-.platform-page .navbar a { color: var(--button-ink) !important; }
-.platform-page .navbar-brand { padding: 4px 8px; border-radius: 8px; background: #fff; }
+.platform-page .navbar a { color: #fff !important; }
+.platform-page .navbar-brand { padding: 4px 8px; }
 .platform-page .navbar-brand img { display: block; width: 112px; height: auto; }
 .platform-page .btn-dark { --bs-btn-bg: var(--accent); --bs-btn-color: var(--button-ink); --bs-btn-border-color: var(--accent); --bs-btn-hover-bg: var(--accent-hover); --bs-btn-hover-color: var(--button-ink); }
 .platform-page .btn-outline-dark { --bs-btn-color: var(--accent); --bs-btn-border-color: var(--accent); --bs-btn-hover-bg: var(--accent); --bs-btn-hover-color: var(--button-ink); --bs-btn-hover-border-color: var(--accent); }

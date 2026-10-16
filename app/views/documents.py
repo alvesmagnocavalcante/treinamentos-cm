@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required, permission_required
 from django.core.exceptions import PermissionDenied
@@ -7,9 +8,11 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
 
 from app import runtime
-from app.forms import DocumentUploadForm
+from app.forms import DocumentUploadForm, DriveSyncForm
 from app.models import Documento, Treinamento
 from app.services.errors import ServiceError
+from app.services.drive import DriveClient
+from app.services.drive_sync import DriveSyncService
 from app.services.ingest import stored_file_exists, stored_path
 
 
@@ -23,6 +26,8 @@ def render_documents(request, training, error=None):
         "pode_enviar": request.user.has_perm("app.add_documento"),
         "pode_reindexar": request.user.has_perm("app.change_documento"),
         "pode_excluir": request.user.has_perm("app.delete_documento"),
+        "pode_sincronizar": request.user.has_perms(("app.add_documento", "app.change_documento", "app.change_treinamento")),
+        "avisos": messages.get_messages(request),
     }, status=error.status_code if error else 200, using="jinja2")
     if error is not None and error.retry_after is not None:
         response["Retry-After"] = str(error.retry_after)
@@ -47,6 +52,23 @@ def documents(request, training_id):
             service.index(document)
     except ServiceError as exc:
         return render_documents(request, training, exc)
+    return redirect("training_documents", training_id=training.pk)
+
+
+@staff_member_required
+@permission_required(("app.view_documento", "app.add_documento", "app.change_documento", "app.change_treinamento"), raise_exception=True)
+@require_POST
+def sync_drive(request, training_id):
+    training = get_object_or_404(Treinamento.objects.select_related("setor"), pk=training_id)
+    form = DriveSyncForm(request.POST)
+    if not form.is_valid():
+        return render_documents(request, training, ServiceError(str(form.errors["pasta"][0]), 422))
+    try:
+        with runtime.document_lock, runtime.services() as (service, _), DriveClient.connect(settings.SERVICE_SETTINGS) as drive:
+            result = DriveSyncService(service, drive).sync(training, form.cleaned_data["pasta"])
+    except ServiceError as exc:
+        return render_documents(request, training, exc)
+    messages.success(request, f"Drive sincronizado: {result.indexed} documento(s) indexado(s), {result.unchanged} sem alterações.")
     return redirect("training_documents", training_id=training.pk)
 
 

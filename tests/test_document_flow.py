@@ -197,3 +197,32 @@ def test_endpoint_guards(flow):
     assert client.post("/treinamentos/1/perguntar",data="bad",content_type="application/json").status_code == 422
     assert client.post("/treinamentos/1/perguntar",{"pergunta":"Teste"}).status_code == 415
     assert client.generic("POST","/admin/treinamentos/1/documentos",b"",content_type="multipart/form-data; boundary=test",CONTENT_LENGTH=str(20*1024*1024)).status_code == 413
+
+
+def test_drive_import_reaches_chat_with_real_chroma(flow, monkeypatch):
+    from types import SimpleNamespace
+    from app.services.drive import DriveClient, DriveFile
+
+    client, config, calls, state, store = flow
+    folder = "https://drive.google.com/drive/folders/folder_123456789"
+    file = DriveFile("document_123456789", "Procedimento.pdf", "application/pdf", "1", 0)
+
+    @contextmanager
+    def download(remote):
+        yield SimpleUploadedFile(remote.name, make_pdf(), content_type=remote.mime)
+
+    @contextmanager
+    def connect(config):
+        yield SimpleNamespace(list_documents=lambda url: [file], download=download)
+
+    monkeypatch.setattr(DriveClient, "connect", connect)
+    endpoint = "/admin/treinamentos/1/documentos/drive"
+    assert client.post(endpoint, {"pasta": folder}).status_code == 302
+    assert store.collection.count() == 1
+    assert Documento.objects.get().drive_file_id == file.id
+    assert "disponibilidade" in ask(client).json()["resposta"]
+    before = len(calls)
+    assert client.post(endpoint, {"pasta": folder}).status_code == 302
+    assert len(calls) == before
+    assert store.collection.count() == 1
+    assert client.get("/documentos/1/arquivo").status_code == 200
