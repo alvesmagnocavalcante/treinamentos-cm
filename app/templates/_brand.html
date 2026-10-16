@@ -1,0 +1,6 @@
+{% macro symbol(size=44) -%}
+<span class="carmel-symbol" aria-hidden="true">
+  <img class="symbol-brown" src="{{ static('brand/carmel-symbol-brown.png') }}" alt="" width="{{ size }}" height="{{ size }}" decoding="async">
+  <img class="symbol-white" src="{{ static('brand/carmel-symbol-white.png') }}" alt="" width="{{ size }}" height="{{ size }}" decoding="async">
+</span>
+{%- endmacro %}

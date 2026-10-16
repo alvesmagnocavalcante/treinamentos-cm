@@ -1,0 +1,47 @@
+/* A identidade usa os mesmos tokens e a preferência nativa de tema do Django. */
+:root, html[data-theme="light"], html[data-theme="dark"], html[data-theme="auto"] {
+  --font-family-primary: var(--font-body);
+  --primary: #4c3427;
+  --secondary: #4c3427;
+  --primary-fg: #fff;
+  --header-bg: #4c3427;
+  --header-color: #e7d0a7;
+  --header-link-color: #fff;
+  --body-bg: var(--surface);
+  --body-fg: var(--ink);
+  --body-quiet-color: var(--muted);
+  --body-loud-color: var(--ink);
+  --breadcrumbs-bg: var(--accent-soft);
+  --breadcrumbs-fg: var(--ink);
+  --breadcrumbs-link-fg: var(--accent);
+  --link-fg: var(--accent);
+  --link-hover-color: var(--focus);
+  --link-selected-fg: var(--accent);
+  --hairline-color: var(--line);
+  --border-color: var(--line);
+  --darkened-bg: var(--surface-muted);
+  --selected-bg: var(--accent-soft);
+  --selected-row: var(--accent-soft);
+  --button-bg: var(--accent);
+  --button-fg: var(--button-ink);
+  --button-hover-bg: var(--accent-hover);
+  --default-button-bg: var(--accent);
+  --default-button-hover-bg: var(--accent-hover);
+  --close-button-bg: var(--accent);
+  --close-button-hover-bg: var(--accent-hover);
+  --object-tools-bg: var(--accent);
+  --object-tools-hover-bg: var(--accent-hover);
+  --error-fg: var(--error);
+  --message-error-bg: var(--error-bg);
+}
+body { font-family: var(--font-body); }
+#header { padding-top: 10px; padding-bottom: 10px; }
+#site-name { margin: 0; }
+.admin-brand { display: flex; align-items: center; flex-wrap: wrap; gap: 18px; font-size: 18px; font-family: var(--font-body); }
+.admin-brand img { display: block; width: 120px; height: auto; filter: brightness(0) invert(1); }
+.admin-brand span { color: #fff; }
+.theme-toggle { min-width: 44px; min-height: 44px; }
+:focus-visible { outline-color: var(--focus); }
+@media (max-width: 767px) {
+  .admin-brand { justify-content: center; gap: 12px; font-size: 15px; }
+}

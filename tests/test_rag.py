@@ -1,3 +1,4 @@
+import json
 from unittest.mock import Mock
 
 import pytest
@@ -25,7 +26,7 @@ def test_rag_context_citations_and_scope():
     result = rag.answer("Como proceder?", 1, [1])
     assert result["fontes"][0]["pagina"] == 3
     assert result["fontes"][0]["documento"] == "POP.pdf"
-    rag.store.search.assert_called_once_with([1, 0, 0], 1, [1], top_k=5)
+    rag.store.search.assert_called_once_with([1, 0, 0], 1, [1], top_k=15)
     system, user = rag.llm.complete.call_args.args
     assert "Não invente" in system
     assert "Consulte a disponibilidade." in user
@@ -56,3 +57,45 @@ def test_only_cited_sources_are_returned():
     result = rag.answer("Como proceder?", 1, [1, 2])
     assert len(result["fontes"]) == 1
     assert result["fontes"][0]["documento_id"] == 2
+
+
+def test_answer_page_after_first_five_slides_is_retrieved():
+    hits = [hit(distance=0.25 + i * 0.01) for i in range(7)]
+    hits.append(SearchHit("MISSÃO: Proporcionar boas lembranças.", {
+        "treinamento_id": 1, "documento_id": 1, "documento": "Integração.pdf", "pagina": 5,
+    }, 0.34))
+    rag = services(hits)
+    rag.store.search.side_effect = lambda embedding, training_id, document_ids, top_k: hits[:top_k]
+
+    def complete(system, user):
+        context = json.loads(user)["CONTEXTO"]
+        source = next((item for item in context if "MISSÃO:" in item["texto"]), None)
+        return f"Proporcionar boas lembranças [{source['id']}]." if source else NOT_FOUND
+
+    rag.llm.complete.side_effect = complete
+    result = rag.answer("Qual a missão da empresa?", 1, [1])
+    assert result["resposta"] == "Proporcionar boas lembranças."
+    assert result["fontes"][0]["pagina"] == 5
+
+
+@pytest.mark.parametrize("footer", [
+    "Fonte: POP.pdf, página 3. [1]",
+    "Fonte – POP.pdf, página 3. [1]",
+    "**Fontes:**\nPOP.pdf, página 3. [1]",
+    "### Referências:\n[1] POP.pdf",
+])
+def test_source_footer_is_removed_after_citation_validation(footer):
+    rag = services([hit()], f"Pode consultar a **disponibilidade** primeiro! [1]\n\n{footer}")
+    result = rag.answer("Como proceder?", 1, [1])
+    assert result["resposta"] == "Pode consultar a disponibilidade primeiro!"
+    assert result["fontes"][0]["documento_id"] == 1
+
+
+def test_source_footer_with_invalid_citation_is_still_rejected():
+    rag = services([hit()], "Pode confirmar! [1]\n\nFonte: POP.pdf [99]")
+    assert rag.answer("Como proceder?", 1, [1]) == {"resposta": NOT_FOUND, "fontes": []}
+
+
+def test_source_footer_without_answer_abstains():
+    rag = services([hit()], "Fonte: POP.pdf [1]")
+    assert rag.answer("Como proceder?", 1, [1]) == {"resposta": NOT_FOUND, "fontes": []}

@@ -1,0 +1,36 @@
+/* Usa as cores do Django Admin, inclusive no tema escuro. */
+body.dashboard #content { width: auto; }
+.dashboard { min-width: 0; }
+.dashboard-intro { margin: 0 0 24px; color: var(--body-quiet-color); line-height: 1.6; }
+.dashboard-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px; margin-bottom: 28px; }
+.dashboard-metric { display: flex; flex-direction: column; gap: 8px; padding: 20px; border: 1px solid var(--hairline-color); border-radius: 10px; background: var(--darkened-bg); }
+.dashboard-metric:hover { border-color: var(--link-fg); }
+.dashboard-metric span { font-weight: 600; }
+.dashboard-metric strong { color: var(--body-fg); font-size: 32px; line-height: 1.1; }
+.dashboard-metric small { color: var(--body-quiet-color); }
+.dashboard-section { margin: 0 0 28px; }
+.dashboard-section > h2, .dashboard-heading h2 { margin: 0 0 16px; font-size: 18px; }
+.dashboard-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.dashboard-heading h2 { margin: 0; }
+.dashboard-section .module table { width: 100%; }
+.dashboard-filters { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; padding: 16px; background: var(--darkened-bg); border-radius: 10px; margin-bottom: 16px; }
+.dashboard-filters label { display: block; margin-bottom: 6px; font-weight: 600; }
+.dashboard-filters input, .dashboard-filters select { box-sizing: border-box; min-height: 38px; max-width: 100%; margin: 0; }
+.dashboard-filters input { width: 260px; }
+.dashboard-button, a.dashboard-button:link, a.dashboard-button:visited { display: inline-block; box-sizing: border-box; padding: 10px 16px; border: 0; border-radius: 6px; background: var(--button-bg); color: var(--button-fg); font: inherit; cursor: pointer; text-decoration: none; }
+.dashboard-button:hover, a.dashboard-button:hover { background: var(--button-hover-bg); }
+.dashboard-table { overflow-x: auto; }
+.dashboard-table table { width: 100%; }
+.dashboard-result-count { padding: 0 0 12px; text-align: left; color: var(--body-quiet-color); }
+.dashboard-table th, .dashboard-table td { padding: 14px 12px; vertical-align: middle; overflow-wrap: anywhere; }
+.dashboard-status { display: inline-block; padding: 4px 9px; border: 1px solid var(--border-color); border-radius: 20px; color: var(--body-quiet-color); white-space: nowrap; }
+.dashboard-status.is-active { color: var(--link-fg); border-color: var(--link-fg); }
+.dashboard-actions { display: flex; flex-wrap: wrap; gap: 10px 16px; }
+.dashboard-pagination { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 20px; }
+@media (max-width: 767px) {
+  .dashboard-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .dashboard-metric { padding: 15px; }
+  .dashboard-filters > div { width: 100%; }
+  .dashboard-filters input, .dashboard-filters select { width: 100%; }
+  .dashboard-table table { min-width: 580px; }
+}

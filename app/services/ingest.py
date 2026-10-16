@@ -130,10 +130,18 @@ def extract_text(path: Path) -> list[TextSection]:
     return sections
 
 
-def stored_path(root: Path, filename: str) -> Path:
+def stored_path(root: Path, filename: str, *, must_exist: bool = True) -> Path:
     path = (root / filename).resolve()
     if path.parent != root.resolve() or path.suffix not in (".pdf", ".docx"):
         raise ServiceError("Caminho do documento inválido.", 422)
-    if not path.is_file():
+    if must_exist and not path.is_file():
         raise ServiceError("Arquivo do documento não encontrado.", 404)
     return path
+
+
+def stored_file_exists(root: Path, filename: str) -> bool:
+    try:
+        stored_path(root, filename)
+    except ServiceError:
+        return False
+    return True

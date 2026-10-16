@@ -1,0 +1,92 @@
+/* Guia de marca Carmel Hotéis, páginas 63 e 64. Fontes hospedadas localmente. */
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  src: url("brand/plus-jakarta-sans.ttf") format("truetype");
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Timeless";
+  src: url("brand/timeless.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+:root {
+  color-scheme: light;
+  --font-body: "Plus Jakarta Sans", "Segoe UI", sans-serif;
+  --font-display: "Timeless", Georgia, serif;
+  --page: #e8e7e1;
+  --surface: #fff;
+  --surface-muted: #f4f1ec;
+  --ink: #4c3427;
+  --muted: #6f6256;
+  --accent: #4c3427;
+  --accent-hover: #6d3914;
+  --accent-soft: #eee7dd;
+  --line: #d5ccbf;
+  --button-ink: #fff;
+  --focus: #b14d1d;
+  --focus-ring: #b14d1d30;
+  --error: #9a351a;
+  --error-bg: #fff0e8;
+  --shadow: #4c342712;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #1d1d1b;
+  --surface: #272621;
+  --surface-muted: #302d27;
+  --ink: #e8e7e1;
+  --muted: #c0b5a6;
+  --accent: #e7d0a7;
+  --accent-hover: #f3e4cd;
+  --accent-soft: #3c3429;
+  --line: #51483d;
+  --button-ink: #4c3427;
+  --focus: #e7d0a7;
+  --focus-ring: #e7d0a730;
+  --error: #ffae89;
+  --error-bg: #442b22;
+  --shadow: #0003;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="auto"], :root:not([data-theme]) {
+    color-scheme: dark;
+    --page: #1d1d1b;
+    --surface: #272621;
+    --surface-muted: #302d27;
+    --ink: #e8e7e1;
+    --muted: #c0b5a6;
+    --accent: #e7d0a7;
+    --accent-hover: #f3e4cd;
+    --accent-soft: #3c3429;
+    --line: #51483d;
+    --button-ink: #4c3427;
+    --focus: #e7d0a7;
+    --focus-ring: #e7d0a730;
+    --error: #ffae89;
+    --error-bg: #442b22;
+    --shadow: #0003;
+  }
+}
+[hidden] { display: none !important; }
+/* O PNG original já é transparente; o filtro preserva seu desenho e canal alfa. */
+:root[data-theme="dark"] .brand-logo { filter: brightness(0) invert(1); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .brand-logo { filter: brightness(0) invert(1); }
+}
+.navbar-brand img { filter: brightness(0) invert(1); }
+.carmel-symbol { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; line-height: 0; vertical-align: middle; }
+.carmel-symbol img { display: block; object-fit: contain; max-width: 100%; }
+.carmel-symbol .symbol-white { display: none; }
+:root[data-theme="dark"] .carmel-symbol .symbol-brown { display: none; }
+:root[data-theme="dark"] .carmel-symbol .symbol-white { display: block; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .carmel-symbol .symbol-brown { display: none; }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .carmel-symbol .symbol-white { display: block; }
+}
+.theme-switch { display: inline-grid; place-items: center; width: 44px; height: 44px; flex-shrink: 0; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--accent); cursor: pointer; }
+.theme-switch:hover { background: var(--accent-soft); }
+.theme-switch:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }

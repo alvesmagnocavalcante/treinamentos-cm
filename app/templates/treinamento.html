@@ -1,5 +1,6 @@
 {% extends "learner_base.html" %}
 {% from "_icons.html" import icon %}
+{% from "_brand.html" import symbol %}
 {% block title %}{{ treinamento.titulo }} · Treinamento interno{% endblock %}
 {% block content %}
 <div class="training-heading">
@@ -9,8 +10,12 @@
   {% if treinamento.descricao %}<p class="training-description">{{ treinamento.descricao }}</p>{% endif %}
 </div>
 
+<nav id="training-tabs" class="training-tabs" role="tablist" aria-label="Treinamento" hidden>
+  <button id="lesson-tab" type="button" role="tab" aria-controls="lesson-panel" aria-selected="true">Conteúdo</button>
+  <button id="assistant-tab" type="button" role="tab" aria-controls="assistant-panel" aria-selected="false" tabindex="-1">Assistente</button>
+</nav>
 <div class="learning-workspace">
-  <div class="lesson-column">
+  <div id="lesson-panel" class="lesson-column">
     {% if treinamento.publicadas | length > 1 %}
     <nav class="lesson-list-card" aria-label="Aulas do treinamento">
       <div class="section-heading"><h2>Aulas do treinamento</h2><span class="count-badge">{{ treinamento.publicadas | length }}</span></div>
@@ -21,17 +26,29 @@
       </ol>
     </nav>
     {% endif %}
-    <section class="lesson-card" aria-labelledby="video-title">
-      <div class="section-heading"><h2 id="video-title">{{ aula_atual.titulo if aula_atual else 'Seu treinamento' }}</h2>{% if video_preview_url %}<span class="section-label">VÍDEO</span>{% endif %}</div>
-      {% if video_preview_url %}
+    <section class="lesson-card" aria-label="{{ aula_atual.titulo if aula_atual else 'Conteúdo do treinamento' }}">
+      {% if aula_atual and aula_atual.titulo != treinamento.titulo %}<div class="section-heading"><h2>{{ aula_atual.titulo }}</h2></div>{% endif %}
+      {% if has_video %}
       <div class="lesson-media">
-        <iframe src="{{ video_preview_url }}" title="Vídeo: {{ treinamento.titulo }}" referrerpolicy="no-referrer" allowfullscreen></iframe>
+        <video id="lesson-video" src="{{ url('lesson_video', args=[aula_atual.pk]) }}" aria-label="Vídeo: {{ aula_atual.titulo }}" controls playsinline preload="metadata"></video>
       </div>
-      <div class="video-caption"><span>Assista no seu ritmo.</span><a href="{{ aula_atual.video_url }}" target="_blank" rel="noopener noreferrer">Abrir no Google Drive {{ icon('external', 13) }}</a></div>
+      <div id="video-controls" class="video-controls" role="group" aria-label="Controles do vídeo" hidden>
+        <button id="video-play" type="button" aria-label="Reproduzir vídeo">▶</button>
+        <label class="visually-hidden" for="video-progress">Posição do vídeo</label>
+        <input id="video-progress" type="range" min="0" max="100" step="0.1" value="0" aria-label="Posição do vídeo" disabled>
+        <span id="video-time" class="video-time">0:00</span>
+        <button id="video-mute" type="button" aria-label="Silenciar vídeo" title="Silenciar vídeo">
+          <span data-volume-on>{{ icon('volume', 20) }}</span>
+          <span data-volume-off hidden>{{ icon('volume-off', 20) }}</span>
+        </button>
+        <button id="video-fullscreen" type="button" aria-label="Tela cheia" title="Tela cheia">{{ icon('external', 18) }}</button>
+      </div>
+      <p id="video-error" class="video-error" role="status" hidden>Não foi possível reproduzir aqui. Use Abrir vídeo.</p>
+      <div class="video-caption"><a href="{{ aula_atual.video_url }}" target="_blank" rel="noopener noreferrer">Abrir vídeo {{ icon('external', 13) }}</a></div>
       {% else %}
       {% if not aula_atual or not aula_atual.conteudo %}<div class="video-empty"><span class="video-empty-icon">{{ icon('book', 24) }}</span><p>Explore os materiais do treinamento.</p><span>Consulte os documentos e tire suas dúvidas com o assistente.</span></div>{% endif %}
       {% endif %}
-      {% if aula_atual and aula_atual.conteudo %}<details class="lesson-notes" {% if not video_preview_url %}open{% endif %}><summary>Ler explicação da aula {{ icon('chevron', 14) }}</summary><div class="training-content">{{ aula_atual.conteudo }}</div></details>{% endif %}
+      {% if aula_atual and aula_atual.conteudo %}<details class="lesson-notes" {% if not has_video %}open{% endif %}><summary>Ler explicação da aula {{ icon('chevron', 14) }}</summary><div class="training-content">{{ aula_atual.conteudo }}</div></details>{% endif %}
     </section>
 
     <details class="materials-card" aria-labelledby="materials-title">
@@ -40,7 +57,7 @@
         {% for documento in treinamento.materiais %}
         <a class="material-link" href="/documentos/{{ documento.id }}/arquivo" target="_blank" rel="noopener noreferrer" title="{{ documento.nome }}">
           <span class="document-icon">{{ icon('document', 20) }}</span>
-          <span class="material-info"><span class="material-name">{{ documento.nome }}</span><span class="material-type">{{ documento.tipo | upper }} · Abrir documento</span></span>
+          <span class="material-info"><span class="material-name">{{ documento.nome }}</span><span class="material-type">{{ documento.tipo | upper }} · {{ 'Disponível no assistente' if documento.processado else 'Consulta no assistente pendente' }}</span></span>
           {{ icon('external', 15) }}
         </a>
         {% else %}<p class="materials-empty">Nenhum material disponível.</p>{% endfor %}
@@ -49,16 +66,15 @@
     <p class="lesson-hint">{{ icon('sparkles', 16) }} Ficou com alguma dúvida? Converse com o assistente.</p>
   </div>
 
-  <section class="assistant-card" aria-labelledby="assistant-title">
+  <section id="assistant-panel" class="assistant-card" aria-labelledby="assistant-title">
     <header class="assistant-header">
-      <span class="assistant-avatar">{{ icon('sparkles', 22) }}</span>
-      <div class="assistant-heading"><h2 id="assistant-title">Seu assistente de aprendizado</h2><p><span class="status-dot"></span> Respostas com base nos materiais</p></div>
+      <div class="assistant-heading"><h2 id="assistant-title">Assistente</h2></div>
       <button id="clear-chat" type="button" class="icon-button" aria-label="Limpar conversa" title="Limpar conversa">{{ icon('reset', 18) }}</button>
     </header>
 
     <div id="chat-history" class="chat-history" role="log" aria-live="polite" aria-label="Conversa sobre o treinamento">
       <div id="chat-empty" class="chat-empty">
-        <span class="welcome-icon">{{ icon('sparkles', 30) }}</span>
+        <span class="welcome-icon">{{ symbol(52) }}</span>
         <span class="welcome-eyebrow">APRENDER É CONVERSAR</span>
         <h3>Vamos entender melhor?</h3>
         <p>Pergunte sobre o treinamento.<br>Estou aqui para ajudar você a colocar em prática.</p>
@@ -72,6 +88,12 @@
     </div>
 
     <div class="composer-area">
+      <div id="chat-loading" class="chat-typing" role="status" hidden>
+        <span class="visually-hidden">Respondendo</span>
+        <span class="typing-dot" aria-hidden="true"></span>
+        <span class="typing-dot" aria-hidden="true"></span>
+        <span class="typing-dot" aria-hidden="true"></span>
+      </div>
       <p id="chat-status" class="chat-status" role="status"></p>
       <form id="chat-form" class="chat-composer" data-training-id="{{ treinamento.id }}" data-user-id="{{ request.user.id }}">
         {{ csrf_input }}
@@ -79,10 +101,12 @@
         <textarea id="pergunta" name="pergunta" rows="1" maxlength="2000" placeholder="Escreva sua dúvida aqui…" required aria-describedby="composer-help"></textarea>
         <button class="send-button" type="submit" aria-label="Enviar pergunta" title="Enviar pergunta" disabled>{{ icon('send', 21) }}</button>
       </form>
-      <div class="composer-footnote"><span id="composer-help">Confira as fontes antes de aplicar o procedimento.</span><span class="keyboard-hint">Enter para enviar</span></div>
+      <div class="composer-footnote"><span id="composer-help">Em caso de dúvida, confirme com o responsável pelo treinamento.</span><span class="keyboard-hint">Enter para enviar</span></div>
     </div>
     <noscript><p class="materials-empty">Ative o JavaScript para conversar com o assistente.</p></noscript>
   </section>
 </div>
-<script src="{{ static('chat.js') }}" defer></script>
+<script src="{{ static('training.js') }}?v=3" defer></script>
+<script src="{{ static('video.js') }}?v=2" defer></script>
+<script src="{{ static('chat.js') }}?v=5" defer></script>
 {% endblock %}

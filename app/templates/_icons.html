@@ -7,9 +7,14 @@
 {% elif name == 'play' %}<path d="m9 5 11 7-11 7V5Z"/>
 {% elif name == 'sparkles' %}<path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3Z"/><path d="m20 2 .6 1.4L22 4l-1.4.6L20 6l-.6-1.4L18 4l1.4-.6L20 2Z"/>
 {% elif name == 'document' %}<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z"/><path d="M14 2v6h6M8 13h8m-8 4h6"/>
+{% elif name == 'grid' %}<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
 {% elif name == 'reset' %}<path d="M3 10a9 9 0 1 1 2.5 8M3 4v6h6"/>
 {% elif name == 'send' %}<path d="M12 20V4m-6 6 6-6 6 6"/>
 {% elif name == 'chevron' %}<path d="m9 5 7 7-7 7"/>
+{% elif name == 'volume' %}<path d="m11 5-5 4H3v6h3l5 4V5Z"/><path d="M15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/>
+{% elif name == 'volume-off' %}<path d="m11 5-5 4H3v6h3l5 4V5Z"/><path d="m16 9 6 6m0-6-6 6"/>
+{% elif name == 'moon' %}<path d="M20.5 13.3A9 9 0 0 1 10.7 3.5a9 9 0 1 0 9.8 9.8Z"/>
+{% elif name == 'sun' %}<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.4 1.4m11.2 11.2L19 19M5 19l1.4-1.4M17.6 6.4 19 5"/>
 {% endif %}
 </svg>
 {%- endmacro %}

@@ -9,7 +9,6 @@ from django.db.models.deletion import ProtectedError
 from django.test import Client
 
 from app.models import Aula, Documento, Setor, Treinamento
-from app.services.rag import NOT_FOUND
 
 pytestmark = pytest.mark.django_db
 
@@ -59,7 +58,7 @@ def test_multiple_lessons_keep_training_rag_scope(employee_client, training):
     assert "Aulas do treinamento" in page.content.decode()
     assert hidden.titulo not in page.content.decode()
     page = employee_client.get(f"/treinamentos/{training.pk}?aula={second.pk}")
-    assert 'src="https://drive.google.com/file/d/video-two/preview"' in page.content.decode()
+    assert f'src="/aulas/{second.pk}/video"' in page.content.decode()
     assert "Explicação da primeira aula." not in page.content.decode()
     assert employee_client.get(f"/treinamentos/{training.pk}?aula={hidden.pk}").status_code == 404
     assert employee_client.get(f"/treinamentos/{training.pk}?aula=bad").status_code == 404
@@ -67,7 +66,8 @@ def test_multiple_lessons_keep_training_rag_scope(employee_client, training):
     foreign = Aula.objects.create(treinamento=other, titulo="Outra", ordem=1)
     assert employee_client.get(f"/treinamentos/{training.pk}?aula={foreign.pk}").status_code == 404
     result = employee_client.post(f"/treinamentos/{training.pk}/perguntar", {"pergunta":"Como proceder?"}, content_type="application/json")
-    assert result.json() == {"resposta":NOT_FOUND,"fontes":[]}
+    assert result.status_code == 409
+    assert "indexação" in result.json()["detail"]
 
 
 def test_inactive_and_missing_training(employee_client, training):
@@ -122,7 +122,8 @@ def test_missing_original_is_not_exposed_or_used_in_rag(staff_client,training,pl
     status = staff_client.get(f"/admin/treinamentos/{training.pk}/documentos").content.decode()
     assert "Arquivo ausente" in status
     response = staff_client.post(f"/treinamentos/{training.pk}/perguntar",{"pergunta":"Como proceder?"},content_type="application/json")
-    assert response.json() == {"resposta":NOT_FOUND,"fontes":[]}
+    assert response.status_code == 409
+    assert "indexação" in response.json()["detail"]
 
 
 def test_staff_needs_explicit_document_permissions(client,django_user_model,training):
@@ -142,7 +143,7 @@ def test_csrf_protects_chat_upload_logout(employee_client,training,django_user_m
     assert client.post(url,{"pergunta":"Teste"},content_type="application/json").status_code == 403
     page = client.get(f"/treinamentos/{training.pk}").content.decode()
     token = re.search(r'name="csrfmiddlewaretoken" value="([^"]+)"',page).group(1)
-    assert client.post(url,{"pergunta":"Teste"},content_type="application/json",HTTP_X_CSRFTOKEN=token).status_code == 200
+    assert client.post(url,{"pergunta":"Teste"},content_type="application/json",HTTP_X_CSRFTOKEN=token).status_code == 409
     assert client.post(url,{"pergunta":"Teste"},content_type="application/json",HTTP_X_CSRFTOKEN=token,HTTP_ORIGIN="https://evil.example").status_code == 403
     assert client.post("/conta/sair/").status_code == 403
     assert client.get("/conta/sair/").status_code == 405

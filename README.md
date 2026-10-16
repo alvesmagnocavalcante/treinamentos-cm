@@ -1,4 +1,4 @@
-# Academia Carmel
+# Carmel Hotéis · Treinamentos
 
 Plataforma Django para treinamentos internos. O colaborador entra com seu usuário,
 seleciona um treinamento, acompanha suas aulas, consulta materiais e tira dúvidas
@@ -8,6 +8,28 @@ Cada treinamento pode ter várias aulas, ordenadas, com vídeo opcional do Googl
 Drive e explicação em texto. Os documentos PDF/DOCX pertencem ao treinamento e
 alimentam o RAG. Vídeos e textos das aulas não são indexados automaticamente.
 A geração de roteiros foi retirada por enquanto; não há integração com HeyGen ou n8n.
+
+## Organização do código
+
+O visual segue o guia de marca da Carmel Hotéis: logotipo oficial, cores da
+Rede, Plus Jakarta Sans e Timeless. Os arquivos utilizados ficam em
+`app/static/brand/`; não há dependência de serviços externos de fontes.
+O botão de sol/lua alterna o tema claro e escuro. A preferência é salva no
+navegador e compartilhada com o Django Admin; sem escolha prévia, acompanha
+o tema do sistema. Os ícones de áudio do vídeo indicam som ativo ou silenciado.
+
+- `config/`: configuração do Django, URLs principais e inicialização.
+- `app/models.py`, `forms.py` e `admin.py`: dados, validação de formulários e administração.
+- `app/views/training.py`: catálogo e aulas; `chat.py`: perguntas; `documents.py`: gestão e download de documentos.
+- `app/services/`: upload, extração, indexação, recuperação e clientes dos provedores de IA.
+- `app/runtime.py`: composição dos serviços e lock das operações com documentos.
+- `app/templates/` e `app/static/`: interface e recursos do navegador.
+- `tests/`: testes de domínio, permissões e integração com provedores simulados.
+
+As views tratam HTTP e permissões; os serviços executam o processamento.
+O upload remove o arquivo se a criação do registro falhar. Se a indexação
+falhar após o cadastro, mantém o documento pendente para nova tentativa.
+Não é necessário adicionar uma camada de repositórios sobre o ORM do Django.
 
 ## Instalação e execução com uv
 
@@ -31,9 +53,21 @@ agora é `manage.py runserver`.
 - Administração: http://127.0.0.1:8765/admin/
 - Login: http://127.0.0.1:8765/conta/entrar/
 
+O painel em `/admin/` mostra indicadores de setores, treinamentos, aulas e
+documentos, além de busca por título/setor e filtro de treinamentos ativos ou
+inativos. Use os atalhos para cadastrar usuários, editar treinamentos e aulas
+ou gerenciar documentos. Os indicadores e ações respeitam as permissões do
+usuário; o link **Administração** aparece no cabeçalho apenas para a equipe.
+
 O login é obrigatório. Não há contas ou senhas padrão. O superusuário é criado
 pelo comando interativo acima. Crie os colaboradores em **Usuários** no Admin,
 sem marcar **Membro da equipe** ou **Superusuário**.
+
+No celular e em tablets até 1000 px, o treinamento usa as abas **Conteúdo**
+e **Assistente**. O chat se ajusta à área visível quando o teclado abre; Enter
+insere uma nova linha e o botão de envio manda a pergunta. No computador,
+conteúdo e chat aparecem lado a lado e Enter envia. A troca de abas preserva
+a conversa e o texto que está sendo digitado.
 
 Em desenvolvimento, se `DJANGO_SECRET_KEY` estiver vazio, uma chave aleatória
 persistente é criada em `.cache/django-secret`, ignorada pelo Git. Fora do
@@ -87,8 +121,19 @@ e reindexe os documentos.
    materiais e o chat do mesmo treinamento.
 
 São aceitos links HTTPS de arquivo do Drive (`/file/d/<id>/view` ou `/open?id=<id>`),
-incluindo `resourcekey`. Pastas e outros provedores são rejeitados. O navegador
-reproduz o vídeo pelo player do Drive; há um link para abri-lo em outra aba.
+incluindo `resourcekey`. Pastas e outros provedores são rejeitados. O vídeo usa
+um player próprio com controles abaixo da imagem, sem sobreposição durante a
+reprodução normal. O servidor retransmite o arquivo do Drive em blocos e aceita
+requisições por intervalo para avançar e voltar; não guarda o vídeo inteiro em
+memória nem o salva em disco. Esse tráfego passa pelo servidor da plataforma.
+
+A transmissão exige login na plataforma e uma aula publicada em treinamento
+ativo. O arquivo também precisa permitir leitura sem uma sessão Google no
+servidor. O sistema não altera as permissões do Drive nem contorna login ou
+bloqueios de download. Para arquivos que exigem conta Google ou ficam
+indisponíveis, o link **Abrir vídeo** continua disponível. Sem JavaScript, são
+usados os controles nativos do navegador; a tela cheia no iOS também pode usar
+os controles do sistema.
 
 Os documentos são enviados e excluídos pela tela de gerenciamento para manter
 banco, arquivos e vetores consistentes. Setores com treinamentos e treinamentos
@@ -142,10 +187,20 @@ seus próprios arquivos estáticos.
 
 PDF/DOCX → extração com página/seção → divisão em trechos → Gemini Embeddings →
 Chroma → recuperação exclusiva por treinamento/documentos indexados →
-OpenRouter → resposta com citações e trechos das fontes.
+OpenRouter → validação interna das citações → resposta em linguagem natural.
+
+O assistente usa um tom amigável e direto, mantendo as regras dos materiais.
+Referências, nomes de arquivos e rodapés de fontes não aparecem na conversa.
+As citações continuam sendo validadas antes de liberar a resposta.
 
 Sem material relevante ou sem citações válidas, o chat informa que não encontrou
-a informação. Citações não comprovam fidelidade semântica: confira as respostas
+a informação. A busca recupera até 15 trechos, mantendo o filtro de distância e
+o isolamento por treinamento. Isso permite encontrar páginas de conteúdo que
+aparecem depois de capas e sumários na busca semântica.
+Sem documentos indexados e com arquivo disponível, o chat informa que os
+materiais precisam ter sua indexação verificada (HTTP 409). O status do material
+também aparece na área do colaborador.
+Citações não comprovam fidelidade semântica: confira as respostas
 contra os procedimentos reais. O histórico fica no navegador, limitado a 20
 mensagens por usuário e treinamento, e não é enviado ao modelo. Cada pergunta
 deve ser compreensível sozinha.

@@ -5,7 +5,7 @@ from django.utils.html import format_html
 from app.models import Aula, Documento, Setor, Treinamento
 
 admin.site.site_header = "Carmel · Administração"
-admin.site.site_title = "Academia Carmel"
+admin.site.site_title = "Carmel Hotéis"
 admin.site.index_title = "Gestão dos treinamentos"
 
 

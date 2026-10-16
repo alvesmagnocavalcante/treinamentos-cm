@@ -4,6 +4,7 @@ const chatHistory = document.getElementById("chat-history");
 const messageList = document.getElementById("chat-messages");
 const emptyState = document.getElementById("chat-empty");
 const statusLabel = document.getElementById("chat-status");
+const typingIndicator = document.getElementById("chat-loading");
 const questionInput = form.elements.pergunta;
 const sendButton = form.querySelector('button[type="submit"]');
 const clearButton = document.getElementById("clear-chat");
@@ -22,7 +23,18 @@ function persist() {
   try { sessionStorage.setItem(storageKey, JSON.stringify(messages)); } catch { /* Sem persistência. */ }
 }
 
-function render() {
+function assistantText(text, sources) {
+  const sourceIds = new Set(sources.map(source => String(source.id)));
+  return text
+    .split(/^[ \t]*(?:#{1,6}[ \t]+)?(?:\*\*)?(?:fontes?|refer[eê]ncias?)(?:\*\*)?[ \t]*(?::|[-–—])/im, 1)[0]
+    .replace(/\[(\d+)\]/g, (marker, id) => sourceIds.has(id) ? "" : marker)
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/[ \t]+([.,;:!?])/g, "$1")
+    .replace(/[ \t]+\n/g, "\n")
+    .trim();
+}
+
+function render(showLatestAnswer = false) {
   messageList.replaceChildren();
   emptyState.hidden = messages.length > 0;
   for (const message of messages) {
@@ -33,23 +45,17 @@ function render() {
     author.textContent = message.role === "user" ? "Você" : "Assistente";
     const text = document.createElement("p");
     text.className = "message-text training-content";
-    text.textContent = message.text;
+    const sources = message.role === "assistant" && Array.isArray(message.sources)
+      ? message.sources.filter(source => source && typeof source === "object") : [];
+    text.textContent = message.role === "assistant" ? assistantText(message.text, sources) : message.text;
     article.append(author, text);
-    for (const source of Array.isArray(message.sources) ? message.sources : []) {
-      if (!source || typeof source !== "object") continue;
-      const details = document.createElement("details");
-      details.className = "chat-source";
-      const summary = document.createElement("summary");
-      summary.textContent = `[${source.id}] ${source.documento}${source.pagina ? ` · Página ${source.pagina}` : ` · ${source.secao || "Seção"}`}`;
-      const quote = document.createElement("p");
-      quote.className = "training-content";
-      quote.textContent = source.trecho;
-      details.append(summary, quote);
-      article.append(details);
-    }
     messageList.append(article);
   }
   chatHistory.scrollTop = chatHistory.scrollHeight;
+  if (showLatestAnswer && messageList.lastElementChild) {
+    const top = messageList.lastElementChild.getBoundingClientRect().top;
+    chatHistory.scrollTop += top - chatHistory.getBoundingClientRect().top - 16;
+  }
 }
 
 function updateComposer() {
@@ -65,7 +71,8 @@ form.addEventListener("submit", async event => {
   busy = true;
   clearButton.disabled = true;
   statusLabel.classList.remove("is-error");
-  statusLabel.textContent = "Consultando os materiais…";
+  statusLabel.textContent = "";
+  typingIndicator.hidden = false;
   messages.push({role: "user", text: question});
   persist();
   render();
@@ -83,16 +90,19 @@ form.addEventListener("submit", async event => {
     messages.push({role: "assistant", text: data.resposta, sources: data.fontes});
     statusLabel.textContent = "";
     persist();
-    render();
+    render(true);
   } catch (error) {
     statusLabel.classList.add("is-error");
     statusLabel.textContent = error instanceof TypeError ? "Falha de conexão. Tente novamente." : error.message;
     if (!questionInput.value.trim()) questionInput.value = question;
   } finally {
+    typingIndicator.hidden = true;
     busy = false;
     clearButton.disabled = false;
     updateComposer();
-    questionInput.focus({preventScroll: true});
+    if (window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
+      questionInput.focus({preventScroll: true});
+    }
   }
 });
 
@@ -113,7 +123,8 @@ document.querySelectorAll("[data-question]").forEach(button => {
 });
 questionInput.addEventListener("input", updateComposer);
 questionInput.addEventListener("keydown", event => {
-  if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+  if (event.key === "Enter" && !event.shiftKey && !event.isComposing
+      && window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
     event.preventDefault();
     if (!sendButton.disabled) form.requestSubmit();
   }

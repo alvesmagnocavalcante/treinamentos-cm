@@ -1,0 +1,86 @@
+{% extends "admin/index.html" %}
+{% load static %}
+
+{% block extrastyle %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'admin-dashboard.css' %}">
+{% endblock %}
+
+{% block coltype %}colM{% endblock %}
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+  <p class="dashboard-intro">Organize os treinamentos, publique aulas e acompanhe os documentos da Carmel Hotéis.</p>
+  {% if metrics %}
+  <div class="dashboard-metrics" aria-label="Visão geral">
+    {% for metric in metrics %}
+    <a class="dashboard-metric" href="{{ metric.url }}">
+      <span>{{ metric.label }}</span>
+      <strong>{{ metric.total }}</strong>
+      {% if metric.detail %}<small>{{ metric.detail }}: {{ metric.ready }}</small>{% endif %}
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <section class="dashboard-section" aria-labelledby="management-title">
+    <h2 id="management-title">Gerenciar cadastros</h2>
+    {% include "admin/app_list.html" with app_list=app_list show_changelinks=True %}
+  </section>
+
+  {% if trainings_page is not None %}
+  <section class="dashboard-section" aria-labelledby="trainings-title">
+    <div class="dashboard-heading">
+      <h2 id="trainings-title">Treinamentos</h2>
+      {% if can_add_training %}<a class="dashboard-button" href="{% url 'admin:app_treinamento_add' %}">+ Novo treinamento</a>{% endif %}
+    </div>
+    <form method="get" class="dashboard-filters" role="search">
+      <div>
+        <label for="dashboard-query">Título ou setor</label>
+        <input id="dashboard-query" type="search" name="q" value="{{ search_query }}" maxlength="200" placeholder="Buscar treinamento">
+      </div>
+      <div>
+        <label for="dashboard-status">Status</label>
+        <select id="dashboard-status" name="status">
+          <option value="">Todos</option>
+          <option value="active"{% if status_filter == 'active' %} selected{% endif %}>Ativos</option>
+          <option value="inactive"{% if status_filter == 'inactive' %} selected{% endif %}>Inativos</option>
+        </select>
+      </div>
+      <button class="dashboard-button" type="submit">Filtrar</button>
+      {% if search_query or status_filter %}<a href="{% url 'admin:index' %}">Limpar filtros</a>{% endif %}
+    </form>
+    <div class="dashboard-table">
+      <table>
+        <caption class="dashboard-result-count">{{ trainings_page.paginator.count }} treinamento(s) encontrado(s)</caption>
+        <thead><tr><th scope="col">Treinamento</th><th scope="col">Setor</th><th scope="col">Status</th><th scope="col">Ações</th></tr></thead>
+        <tbody>
+          {% for training in trainings_page %}
+          <tr>
+            <th scope="row"><a href="{% url 'admin:app_treinamento_change' training.pk %}">{{ training.titulo }}</a></th>
+            <td>{{ training.setor.nome }}</td>
+            <td><span class="dashboard-status {% if training.ativo %}is-active{% endif %}">{{ training.ativo|yesno:"Ativo,Inativo" }}</span></td>
+            <td><div class="dashboard-actions">
+              <a href="{% url 'admin:app_treinamento_change' training.pk %}">{% if can_change_training %}Editar e gerenciar aulas{% else %}Consultar{% endif %}</a>
+              {% if can_view_documents %}<a href="{% url 'training_documents' training.pk %}">Documentos</a>{% endif %}
+              {% if training.ativo %}<a href="{% url 'training' training.pk %}">Abrir treinamento</a>{% endif %}
+            </div></td>
+          </tr>
+          {% empty %}<tr><td colspan="4">Nenhum treinamento encontrado.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if trainings_page.has_other_pages %}
+    <nav class="dashboard-pagination" aria-label="Páginas de treinamentos">
+      {% if trainings_page.has_previous %}<a href="?q={{ search_query|urlencode }}&amp;status={{ status_filter }}&amp;page={{ trainings_page.previous_page_number }}">← Anterior</a>{% endif %}
+      <span>Página {{ trainings_page.number }} de {{ trainings_page.paginator.num_pages }}</span>
+      {% if trainings_page.has_next %}<a href="?q={{ search_query|urlencode }}&amp;status={{ status_filter }}&amp;page={{ trainings_page.next_page_number }}">Próxima →</a>{% endif %}
+    </nav>
+    {% endif %}
+  </section>
+  {% elif can_add_training %}
+  <a class="dashboard-button" href="{% url 'admin:app_treinamento_add' %}">+ Novo treinamento</a>
+  {% endif %}
+</div>
+{% endblock %}

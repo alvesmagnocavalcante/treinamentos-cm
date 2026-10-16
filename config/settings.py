@@ -26,7 +26,7 @@ if not SECRET_KEY:
 
 ALLOWED_HOSTS = [host.strip() for host in os.getenv("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost").split(",") if host.strip()]
 INSTALLED_APPS = [
-    "django.contrib.admin", "django.contrib.auth", "django.contrib.contenttypes",
+    "config.apps.TrainingAdminConfig", "django.contrib.auth", "django.contrib.contenttypes",
     "django.contrib.sessions", "django.contrib.messages", "django.contrib.staticfiles", "app.apps.TrainingConfig",
 ]
 MIDDLEWARE = [
@@ -42,7 +42,7 @@ MIDDLEWARE = [
 ]
 ROOT_URLCONF = "config.urls"
 TEMPLATES = [
-    {"BACKEND": "django.template.backends.django.DjangoTemplates", "DIRS": [], "APP_DIRS": True,
+    {"BACKEND": "django.template.backends.django.DjangoTemplates", "DIRS": [ROOT / "app/templates"], "APP_DIRS": True,
      "OPTIONS": {"context_processors": [
          "django.template.context_processors.request", "django.contrib.auth.context_processors.auth",
          "django.contrib.messages.context_processors.messages",
