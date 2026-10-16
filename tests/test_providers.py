@@ -10,7 +10,7 @@ from app.services.llm import LLMService
 
 
 def settings(tmp_path):
-    return Settings(tmp_path / "db.sqlite3", google_api_key="secret-google", openrouter_api_key="secret-router", embedding_dimensions=3)
+    return Settings(google_api_key="secret-google", openrouter_api_key="secret-router", embedding_dimensions=3)
 
 
 def test_embedding_batches_query_type_and_normalization(tmp_path):
@@ -93,7 +93,7 @@ def test_missing_keys_do_not_call_network(tmp_path):
         pytest.fail("Chamada de rede indevida")
 
     with httpx.Client(transport=httpx.MockTransport(forbidden)) as client:
-        empty = Settings(tmp_path / "empty.sqlite3")
+        empty = Settings()
         for function in (lambda: LLMService(empty, client).complete("", ""), lambda: EmbeddingService(empty, client).embed_text("test")):
             with pytest.raises(ServiceError, match="Configure"):
                 function()

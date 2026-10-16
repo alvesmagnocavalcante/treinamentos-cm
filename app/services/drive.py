@@ -107,6 +107,17 @@ class DriveClient:
             except (ValueError, TypeError):
                 raise ServiceError("O Drive retornou uma resposta inválida.", 502) from None
 
+    def get_document(self, identifier: str) -> DriveFile:
+        if not re.fullmatch(r"[\w-]{10,200}", identifier, re.ASCII):
+            raise ServiceError("ID de documento do Drive inválido.", 422)
+        payload = self.metadata(f"/{identifier}", fields=FILE_FIELDS, supportsAllDrives="true")
+        if payload.get("trashed"):
+            raise ServiceError("O documento foi removido do Drive.", 404)
+        file = DriveFile.from_json(payload)
+        if file.mime not in (PDF, DOCX, GOOGLE_DOC):
+            raise ServiceError("Formato do Drive não suportado.", 415)
+        return file
+
     def list_documents(self, folder: str) -> list[DriveFile]:
         identifier = folder_id(folder)
         metadata = self.metadata(f"/{identifier}", fields="id,mimeType,trashed", supportsAllDrives="true")

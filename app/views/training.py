@@ -1,12 +1,10 @@
-from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.db.models import Prefetch
 from django.http import Http404
 from django.shortcuts import get_object_or_404, render
 from django.views.decorators.http import require_GET
 
-from app.models import Aula, Setor, Treinamento
-from app.services.ingest import stored_file_exists
+from app.models import Aula, Documento, Setor, Treinamento
 from app.services.video import normalize_video_url
 
 
@@ -23,7 +21,7 @@ def index(request):
 def training(request, training_id):
     training = get_object_or_404(
         Treinamento.objects.filter(ativo=True).select_related("setor").prefetch_related(
-            Prefetch("documentos", to_attr="materiais"),
+            Prefetch("documentos", queryset=Documento.objects.defer("arquivo"), to_attr="materiais"),
             Prefetch("aulas", queryset=Aula.objects.filter(ativo=True).order_by("ordem", "pk"), to_attr="publicadas"),
         ), pk=training_id,
     )
@@ -34,10 +32,6 @@ def training(request, training_id):
         lesson = next(iter(training.publicadas), None)
     if selected and lesson is None:
         raise Http404("Aula não encontrada neste treinamento.")
-    training.materiais = [
-        document for document in training.materiais
-        if stored_file_exists(settings.SERVICE_SETTINGS.documents_path, document.caminho)
-    ]
     has_video = bool(lesson and normalize_video_url(lesson.video_url))
     return render(request, "treinamento.html", {
         "treinamento": training, "aula_atual": lesson, "has_video": has_video,

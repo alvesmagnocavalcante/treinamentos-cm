@@ -62,6 +62,9 @@ class DocumentoAdmin(admin.ModelAdmin):
     list_select_related = ("treinamento",)
     actions = None
 
+    def get_queryset(self, request):
+        return super().get_queryset(request).defer("arquivo")
+
     def has_add_permission(self, request):
         return False
 

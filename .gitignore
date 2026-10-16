@@ -1,14 +1,9 @@
 .venv/
-.venv-validation/
 __pycache__/
 *.pyc
 .env
 .secrets/
-/output/
-testdata/
+.archive/
 .pytest_cache/
-app/database/
-media/
-vector_db/
 .cache/
 staticfiles/

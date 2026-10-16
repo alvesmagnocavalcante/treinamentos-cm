@@ -11,7 +11,7 @@ from django.db import DatabaseError
 from docx import Document
 
 from app import runtime
-from app.models import Documento, Setor, Treinamento
+from app.models import Documento, DocumentoTrecho, Setor, Treinamento
 from app.services.documents import DocumentService
 from app.services.embeddings import EmbeddingService
 from app.services.llm import LLMService
@@ -30,7 +30,7 @@ def make_pdf():
 
 
 @pytest.fixture
-def flow(staff_client,platform_settings,settings,monkeypatch):
+def flow(staff_client,platform_settings,settings,monkeypatch,django_db_reset_sequences):
     config = replace(platform_settings,google_api_key="offline-google",openrouter_api_key="offline-router",embedding_dimensions=3)
     settings.SERVICE_SETTINGS = config
     store = VectorStore(config)
@@ -69,7 +69,7 @@ def ask(client,question="Como proceder?"):
     return client.post("/treinamentos/1/perguntar",{"pergunta":question},content_type="application/json")
 
 
-def test_pdf_upload_chat_scope_and_real_chroma(flow):
+def test_pdf_upload_chat_scope_and_real_pgvector(flow):
     client,config,calls,_,store = flow
     assert upload(client).status_code == 302
     assert upload(client,2).status_code == 302
@@ -84,7 +84,7 @@ def test_pdf_upload_chat_scope_and_real_chroma(flow):
     assert response.status_code == 200
     assert b"".join(response.streaming_content).startswith(b"%PDF-")
     assert client.post("/admin/documentos/1/reindexar").status_code == 302
-    assert store.collection.count() == 2
+    assert DocumentoTrecho.objects.count() == 2
     assert "Indexado" in client.get("/admin/treinamentos/1/documentos").content.decode()
 
 
@@ -105,7 +105,7 @@ def test_failed_index_keeps_pending_file_and_retries(flow):
     assert response["Retry-After"] == "60"
     document = Documento.objects.get(pk=1)
     assert not document.processado
-    assert (config.documents_path / document.caminho).is_file()
+    assert bytes(document.arquivo).startswith(b"%PDF-")
     before = len(calls)
     response = ask(client)
     assert response.status_code == 409
@@ -129,11 +129,9 @@ def test_failed_index_keeps_pending_file_and_retries(flow):
 def test_delete_removes_metadata_file_and_vectors(flow):
     client,config,_,_,store = flow
     upload(client)
-    path = config.documents_path / Documento.objects.get(pk=1).caminho
     assert client.post("/admin/documentos/1/excluir").status_code == 302
-    assert not path.exists()
     assert not Documento.objects.exists()
-    assert store.collection.count() == 0
+    assert DocumentoTrecho.objects.count() == 0
     assert client.get("/documentos/1/arquivo").status_code == 404
 
 
@@ -146,35 +144,11 @@ def test_failed_database_save_removes_uploaded_file(flow, monkeypatch):
     monkeypatch.setattr(Documento.objects, "create", fail_save)
     assert upload(client).status_code == 503
     assert not Documento.objects.exists()
-    assert not list(config.documents_path.iterdir())
     assert not calls
 
 
-def test_delete_missing_original_still_removes_record_and_vectors(flow):
-    client, config, _, _, store = flow
-    upload(client)
-    document = Documento.objects.get(pk=1)
-    (config.documents_path / document.caminho).unlink()
-
-    assert client.post("/admin/documentos/1/excluir").status_code == 302
-    assert not Documento.objects.exists()
-    assert store.collection.count() == 0
 
 
-@pytest.mark.parametrize("filename", ["../outside.pdf", "invalid.exe"])
-def test_delete_invalid_path_preserves_record_and_vectors(flow, filename):
-    client, config, _, _, store = flow
-    upload(client)
-    document = Documento.objects.get(pk=1)
-    original = config.documents_path / document.caminho
-    document.caminho = filename
-    document.save(update_fields=["caminho"])
-
-    assert client.post("/admin/documentos/1/excluir").status_code == 422
-    document.refresh_from_db()
-    assert document.processado
-    assert original.is_file()
-    assert store.collection.count() == 1
 
 
 def test_docx_tables_sections_and_chat(flow):
@@ -199,7 +173,7 @@ def test_endpoint_guards(flow):
     assert client.generic("POST","/admin/treinamentos/1/documentos",b"",content_type="multipart/form-data; boundary=test",CONTENT_LENGTH=str(20*1024*1024)).status_code == 413
 
 
-def test_drive_import_reaches_chat_with_real_chroma(flow, monkeypatch):
+def test_drive_import_reaches_chat_with_real_pgvector(flow, monkeypatch):
     from types import SimpleNamespace
     from app.services.drive import DriveClient, DriveFile
 
@@ -213,16 +187,16 @@ def test_drive_import_reaches_chat_with_real_chroma(flow, monkeypatch):
 
     @contextmanager
     def connect(config):
-        yield SimpleNamespace(list_documents=lambda url: [file], download=download)
+        yield SimpleNamespace(list_documents=lambda url: [file], download=download, get_document=lambda identifier: file)
 
     monkeypatch.setattr(DriveClient, "connect", connect)
     endpoint = "/admin/treinamentos/1/documentos/drive"
     assert client.post(endpoint, {"pasta": folder}).status_code == 302
-    assert store.collection.count() == 1
+    assert DocumentoTrecho.objects.count() == 1
     assert Documento.objects.get().drive_file_id == file.id
     assert "disponibilidade" in ask(client).json()["resposta"]
     before = len(calls)
     assert client.post(endpoint, {"pasta": folder}).status_code == 302
     assert len(calls) == before
-    assert store.collection.count() == 1
+    assert DocumentoTrecho.objects.count() == 1
     assert client.get("/documentos/1/arquivo").status_code == 200

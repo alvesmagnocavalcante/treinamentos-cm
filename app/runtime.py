@@ -11,7 +11,6 @@ from app.services.rag import RagService
 from app.services.vector_store import VectorStore
 
 document_lock = RLock()
-# Chroma inicializa sob demanda; nenhuma chamada de IA ocorre na inicialização.
 store = VectorStore(settings.SERVICE_SETTINGS)
 
 

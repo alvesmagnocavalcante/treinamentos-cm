@@ -1,6 +1,7 @@
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
+from pgvector.django import VectorField
 
 from app.services.errors import ServiceError
 from app.services.drive import normalize_folder_url
@@ -82,7 +83,7 @@ class Aula(models.Model):
 class Documento(models.Model):
     treinamento = models.ForeignKey(Treinamento, on_delete=models.PROTECT, related_name="documentos")
     nome = models.CharField(max_length=255)
-    caminho = models.CharField(max_length=255)
+    arquivo = models.BinaryField(null=True, editable=False)
     tipo = models.CharField(max_length=4, choices=[("pdf", "PDF"), ("docx", "DOCX")])
     processado = models.BooleanField("indexado", default=False)
     drive_file_id = models.CharField(max_length=200, blank=True, editable=False)
@@ -95,7 +96,24 @@ class Documento(models.Model):
             models.CheckConstraint(condition=models.Q(tipo__in=["pdf", "docx"]), name="documento_tipo_suportado"),
             models.UniqueConstraint(fields=["treinamento", "drive_file_id"], condition=~models.Q(drive_file_id=""),
                                     name="documento_drive_por_treinamento"),
+            models.CheckConstraint(condition=~models.Q(drive_file_id="") | models.Q(arquivo__isnull=False),
+                                   name="documento_tem_origem"),
         ]
 
     def __str__(self):
         return self.nome
+
+
+class DocumentoTrecho(models.Model):
+    documento = models.ForeignKey(Documento, on_delete=models.CASCADE, related_name="trechos")
+    ordem = models.PositiveIntegerField()
+    texto = models.TextField()
+    pagina = models.PositiveIntegerField(default=0)
+    secao = models.TextField(blank=True)
+    embedding = VectorField()
+    embedding_model = models.CharField(max_length=200)
+    dimensions = models.PositiveSmallIntegerField()
+
+    class Meta:
+        ordering = ["documento_id", "ordem"]
+        constraints = [models.UniqueConstraint(fields=["documento", "ordem"], name="trecho_ordem_por_documento")]

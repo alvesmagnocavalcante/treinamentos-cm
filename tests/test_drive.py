@@ -169,7 +169,17 @@ def sync_flow(platform_settings, monkeypatch):
     embeddings.embed_documents.return_value = [[1.0, 0.0, 0.0]]
     store = Mock()
     documents = DocumentService(platform_settings, embeddings, store)
-    state = {"file": remote_file(), "body": pdf_bytes()}
+    state = {"file": remote_file(), "body": pdf_bytes(), "temporary_paths": []}
+
+    from app.services import drive_sync
+    original_save = drive_sync.save_upload
+
+    def track_upload(*args, **kwargs):
+        path, name = original_save(*args, **kwargs)
+        state["temporary_paths"].append(path)
+        return path, name
+
+    monkeypatch.setattr(drive_sync, "save_upload", track_upload)
 
     def handler(url, **kwargs):
         if url.endswith(FOLDER_ID):
@@ -188,9 +198,9 @@ def test_sync_indexes_skips_and_updates_in_place(sync_flow):
     sync = DriveSyncService(documents, drive)
     assert sync.sync(training, FOLDER_URL).indexed == 1
     document = Documento.objects.get()
-    first_id, first_path = document.pk, documents.settings.documents_path / document.caminho
+    first_id = document.pk
     assert document.processado and document.drive_file_id == FILE_ID
-    assert first_path.is_file()
+    assert document.arquivo is None
     assert documents.store.replace_document.call_args.args[3]["treinamento_id"] == training.pk
     assert sync.sync(training, FOLDER_URL).unchanged == 1
     assert documents.embeddings.embed_documents.call_count == 1
@@ -200,7 +210,7 @@ def test_sync_indexes_skips_and_updates_in_place(sync_flow):
     document.refresh_from_db()
     assert document.pk == first_id and document.nome == "Atualizado.pdf" and document.drive_version == "2"
     assert document.processado
-    assert not first_path.exists()
+    assert all(not path.exists() for path in state["temporary_paths"])
     assert Documento.objects.count() == 1
     assert documents.embeddings.embed_documents.call_count == 2
 
@@ -214,21 +224,13 @@ def test_failed_embedding_keeps_pending_document_for_retry(sync_flow):
         sync.sync(training, FOLDER_URL)
     document = Documento.objects.get()
     assert not document.processado
-    assert (documents.settings.documents_path / document.caminho).is_file()
+    assert document.drive_file_id == FILE_ID
+    assert all(not path.exists() for path in state["temporary_paths"])
     documents.embeddings.embed_documents.side_effect = None
     assert sync.sync(training, FOLDER_URL).indexed == 1
     assert Documento.objects.get().processado
 
 
-@pytest.mark.django_db
-def test_missing_local_copy_is_downloaded_again(sync_flow):
-    training, documents, drive, state = sync_flow
-    sync = DriveSyncService(documents, drive)
-    sync.sync(training, FOLDER_URL)
-    document = Documento.objects.get()
-    (documents.settings.documents_path / document.caminho).unlink()
-    assert sync.sync(training, FOLDER_URL).indexed == 1
-    assert Documento.objects.count() == 1
 
 
 @pytest.mark.django_db
@@ -238,7 +240,7 @@ def test_corrupt_download_does_not_create_record_or_orphan_file(sync_flow):
     with pytest.raises(ServiceError):
         DriveSyncService(documents, drive).sync(training, FOLDER_URL)
     assert not Documento.objects.exists()
-    assert not list(documents.settings.documents_path.iterdir())
+    assert all(not path.exists() for path in state["temporary_paths"])
     documents.embeddings.embed_documents.assert_not_called()
 
 
@@ -248,7 +250,6 @@ def test_failed_update_disables_old_index_until_retry(sync_flow):
     sync = DriveSyncService(documents, drive)
     sync.sync(training, FOLDER_URL)
     original = Documento.objects.get()
-    original_path = documents.settings.documents_path / original.caminho
     state["file"] = remote_file(version="2")
     state["body"] = b"invalid pdf"
     with pytest.raises(ServiceError):
@@ -256,11 +257,11 @@ def test_failed_update_disables_old_index_until_retry(sync_flow):
     original.refresh_from_db()
     assert not original.processado
     assert original.drive_version == "1"
-    assert original_path.is_file()
+    assert original.arquivo is None
     state["body"] = pdf_bytes("Conteudo atualizado para o treinamento.")
     assert sync.sync(training, FOLDER_URL).indexed == 1
     assert Documento.objects.get().processado
-    assert not original_path.exists()
+    assert all(not path.exists() for path in state["temporary_paths"])
 
 
 @pytest.mark.django_db
@@ -274,7 +275,7 @@ def test_database_failure_removes_downloaded_copy(sync_flow, monkeypatch):
     with pytest.raises(DatabaseError):
         DriveSyncService(documents, drive).sync(training, FOLDER_URL)
     assert not Documento.objects.exists()
-    assert not list(documents.settings.documents_path.iterdir())
+    assert all(not path.exists() for path in state["temporary_paths"])
 
 
 @pytest.mark.django_db
@@ -296,7 +297,6 @@ def test_sync_never_deletes_files_removed_from_drive(sync_flow):
     drive.list_documents = lambda folder: []
     assert sync.sync(training, FOLDER_URL).indexed == 0
     assert Documento.objects.count() == 1
-    documents.store.remove_document.assert_not_called()
 
 
 @pytest.mark.django_db

@@ -1,10 +1,12 @@
 from dataclasses import dataclass
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from django.db import transaction
 
 from app.models import Documento
 from app.services.drive import normalize_folder_url
-from app.services.ingest import save_upload, stored_file_exists, stored_path
+from app.services.ingest import save_upload
 
 
 @dataclass
@@ -24,31 +26,24 @@ class DriveSyncService:
         training.save(update_fields=["drive_folder_url"])
         result = SyncResult()
         for file in files:
-            document = Documento.objects.filter(treinamento=training, drive_file_id=file.id).first()
+            document = Documento.objects.defer("arquivo").filter(treinamento=training, drive_file_id=file.id).first()
             config = self.documents.settings
-            if (document and document.processado and document.drive_version == file.version
-                    and stored_file_exists(config.documents_path, document.caminho)):
+            if document and document.processado and document.drive_version == file.version:
                 result.unchanged += 1
                 continue
             # Conteúdo alterado não pode continuar respondendo pelo índice anterior se a atualização falhar.
             if document:
                 document.processado = False
                 document.save(update_fields=["processado"])
-            old_path = stored_path(config.documents_path, document.caminho, must_exist=False) if document else None
-            with self.drive.download(file) as upload:
-                path, name = save_upload(upload, config.documents_path, config.max_upload_bytes)
-            try:
+            with TemporaryDirectory(prefix="carmel-drive-") as directory:
+                with self.drive.download(file) as upload:
+                    path, name = save_upload(upload, Path(directory), config.max_upload_bytes)
                 with transaction.atomic():
                     if document is None:
                         document = Documento(treinamento=training, drive_file_id=file.id)
-                    document.nome, document.caminho, document.tipo = name, path.name, path.suffix[1:]
+                    document.nome, document.tipo = name, path.suffix[1:]
                     document.drive_version, document.processado = file.version, False
                     document.save()
-            except Exception:
-                path.unlink(missing_ok=True)
-                raise
-            if old_path:
-                old_path.unlink(missing_ok=True)
-            self.documents.index(document)
+                self.documents.index(document, source_path=path)
             result.indexed += 1
         return result

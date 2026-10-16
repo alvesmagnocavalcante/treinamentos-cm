@@ -1,10 +1,10 @@
 import os
 import secrets
-from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
 
 from app.config import ROOT, Settings
+from app.database import database_config
 
 SERVICE_SETTINGS = Settings.from_env()
 BASE_DIR = ROOT
@@ -51,8 +51,7 @@ TEMPLATES = [
      "DIRS": [ROOT / "app/templates"], "APP_DIRS": False,
      "OPTIONS": {"environment": "app.jinja2.environment"}},
 ]
-SERVICE_SETTINGS.database_path.parent.mkdir(parents=True, exist_ok=True)
-DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": SERVICE_SETTINGS.database_path, "OPTIONS": {"timeout": 15}}}
+DATABASES = {"default": database_config(SERVICE_SETTINGS)}
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},

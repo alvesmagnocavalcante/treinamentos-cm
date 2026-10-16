@@ -1,7 +1,7 @@
 {% extends "learner_base.html" %}
 {% from "_icons.html" import icon %}
 {% from "_brand.html" import symbol %}
-{% block title %}{{ treinamento.titulo }} · Treinamento interno{% endblock %}
+{% block title %}{{ treinamento.titulo }} · Carmel Hotéis{% endblock %}
 {% block content %}
 <div class="training-heading">
   <a class="back-link" href="/">{{ icon('arrow-left', 16) }} Todos os treinamentos</a>
@@ -78,11 +78,6 @@
         <span class="welcome-eyebrow">APRENDER É CONVERSAR</span>
         <h3>Vamos entender melhor?</h3>
         <p>Pergunte sobre o treinamento.<br>Estou aqui para ajudar você a colocar em prática.</p>
-        <div class="question-suggestions" aria-label="Sugestões de perguntas">
-          <button type="button" data-question="Quais são as principais etapas deste procedimento?">Quais são as principais etapas? {{ icon('arrow-right', 16) }}</button>
-          <button type="button" data-question="Quais cuidados devo ter ao realizar este procedimento?">Quais cuidados devo ter? {{ icon('arrow-right', 16) }}</button>
-          <button type="button" data-question="Resuma as orientações deste treinamento.">Resuma as orientações para mim {{ icon('arrow-right', 16) }}</button>
-        </div>
       </div>
       <div id="chat-messages" class="chat-messages"></div>
     </div>
@@ -98,15 +93,14 @@
       <form id="chat-form" class="chat-composer" data-training-id="{{ treinamento.id }}" data-user-id="{{ request.user.id }}">
         {{ csrf_input }}
         <label for="pergunta" class="visually-hidden">Sua pergunta sobre o treinamento</label>
-        <textarea id="pergunta" name="pergunta" rows="1" maxlength="2000" placeholder="Escreva sua dúvida aqui…" required aria-describedby="composer-help"></textarea>
+        <textarea id="pergunta" name="pergunta" rows="1" maxlength="2000" placeholder="Escreva sua dúvida aqui…" required></textarea>
         <button class="send-button" type="submit" aria-label="Enviar pergunta" title="Enviar pergunta" disabled>{{ icon('send', 21) }}</button>
       </form>
-      <div class="composer-footnote"><span id="composer-help">Em caso de dúvida, confirme com o responsável pelo treinamento.</span><span class="keyboard-hint">Enter para enviar</span></div>
     </div>
     <noscript><p class="materials-empty">Ative o JavaScript para conversar com o assistente.</p></noscript>
   </section>
 </div>
 <script src="{{ static('training.js') }}?v=3" defer></script>
 <script src="{{ static('video.js') }}?v=2" defer></script>
-<script src="{{ static('chat.js') }}?v=5" defer></script>
+<script src="{{ static('chat.js') }}?v=6" defer></script>
 {% endblock %}

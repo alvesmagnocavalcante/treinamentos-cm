@@ -3,6 +3,12 @@
 
 {% block title %}{% if subtitle %}{{ subtitle }} | {% endif %}{{ title }} | Carmel Hotéis{% endblock %}
 
+{% block extrahead %}
+{{ block.super }}
+<link rel="icon" type="image/png" href="{% static 'brand/carmel-symbol-brown.png' %}">
+<link rel="icon" type="image/png" href="{% static 'brand/carmel-symbol-white.png' %}" media="(prefers-color-scheme: dark)">
+{% endblock %}
+
 {% block extrastyle %}
 {{ block.super }}
 <link rel="stylesheet" href="{% static 'brand.css' %}?v=3">

@@ -7,8 +7,9 @@ sem fundo e sem duplicar o arquivo.
 
 - `carmel-hoteis.png`: `LOGOTIPO/REDE/CARMEL HOTÉIS_LOGOTIPO-01.png`.
 - `carmel-symbol-brown.png` e `carmel-symbol-white.png`: versões oficiais de
-  `LOGOTIPO/ÍCONE/`, usadas conforme o tema nos cartões
-  e na abertura do assistente. Proporções, cores e transparência preservadas.
+  `LOGOTIPO/ÍCONE/`, usadas conforme o tema nos cartões,
+  na abertura do assistente e como ícone da aba do navegador. Proporções, cores
+  e transparência preservadas. O favicon acompanha a preferência de cor do navegador.
 - `plus-jakarta-sans.ttf`: `TIPOGRAFIAS/PlusJakartaSans-VariableFont_wght.ttf`.
 - `timeless.ttf`: `TIPOGRAFIAS/Timeless.ttf`.
 

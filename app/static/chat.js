@@ -114,13 +114,6 @@ clearButton.addEventListener("click", () => {
   persist();
   render();
 });
-document.querySelectorAll("[data-question]").forEach(button => {
-  button.addEventListener("click", () => {
-    questionInput.value = button.dataset.question;
-    updateComposer();
-    questionInput.focus({preventScroll: true});
-  });
-});
 questionInput.addEventListener("input", updateComposer);
 questionInput.addEventListener("keydown", event => {
   if (event.key === "Enter" && !event.shiftKey && !event.isComposing

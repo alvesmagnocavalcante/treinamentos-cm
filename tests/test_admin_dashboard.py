@@ -13,7 +13,7 @@ def catalog():
     active = Treinamento.objects.create(setor=sector, titulo="Atendimento")
     inactive = Treinamento.objects.create(setor=sector, titulo="Integração", ativo=False)
     Aula.objects.create(treinamento=active, titulo="Introdução")
-    Documento.objects.create(treinamento=active, nome="POP.pdf", caminho="pop.pdf", tipo="pdf")
+    Documento.objects.create(treinamento=active, nome="POP.pdf", arquivo=b"test-pdf", tipo="pdf")
     return active, inactive
 
 

@@ -1,13 +1,11 @@
-import logging
+import math
 from dataclasses import dataclass
-from threading import RLock
-from uuid import uuid4
 
-from app.config import Settings
-from app.services.chunking import Chunk
+from django.db import transaction
+from pgvector.django import CosineDistance
+
+from app.models import Documento, DocumentoTrecho
 from app.services.errors import ServiceError
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -18,82 +16,47 @@ class SearchHit:
 
 
 class VectorStore:
-    def __init__(self, settings: Settings):
+    """Textos e embeddings no mesmo banco dos treinamentos; busca exata por cosseno."""
+
+    def __init__(self, settings):
         self.settings = settings
-        self.lock = RLock()
-        self._collection = None
-        self._client = None
 
-    @property
-    def collection(self):
-        if self._collection is None:
-            import chromadb
-            from chromadb.config import Settings as ChromaSettings
+    def validate_vector(self, vector):
+        if (len(vector) != self.settings.embedding_dimensions
+                or any(type(v) not in (int, float) or not math.isfinite(v) for v in vector)
+                or not any(vector)):
+            raise ServiceError("Embedding inválido ou com dimensão incompatível.", 422)
 
-            self.settings.vector_path.mkdir(parents=True, exist_ok=True)
-            self._client = chromadb.PersistentClient(
-                path=str(self.settings.vector_path), settings=ChromaSettings(anonymized_telemetry=False),
-            )
-            collection = self._client.get_or_create_collection(
-                name="hotel_training", embedding_function=None,
-                metadata={"hnsw:space": "cosine", "embedding_model": self.settings.embedding_model,
-                          "dimensions": self.settings.embedding_dimensions},
-            )
-            metadata = collection.metadata or {}
-            if (metadata.get("embedding_model") != self.settings.embedding_model
-                    or metadata.get("dimensions") != self.settings.embedding_dimensions):
-                raise ServiceError("O índice usa outro modelo ou dimensão. Configure um novo VECTOR_DB_PATH e reindexe os documentos.", 409)
-            self._collection = collection
-        return self._collection
-
-    def replace_document(self, document_id: int, chunks: list[Chunk], embeddings: list[list[float]], metadata: dict) -> None:
+    def replace_document(self, document_id, chunks, embeddings, metadata):
         if not chunks or len(chunks) != len(embeddings):
-            raise ServiceError("Quantidade de chunks e embeddings incompatível.")
-        with self.lock:
-            try:
-                collection = self.collection
-                generation = uuid4().hex
-                collection.delete(where={"documento_id": document_id})
-                for start in range(0, len(chunks), 100):
-                    batch = chunks[start:start + 100]
-                    collection.add(
-                        ids=[f"{document_id}:{generation}:{start + i}" for i in range(len(batch))],
-                        documents=[chunk.text for chunk in batch],
-                        embeddings=embeddings[start:start + 100],
-                        metadatas=[metadata | {"documento_id": document_id, "pagina": chunk.page, "secao": chunk.section}
-                                   for chunk in batch],
-                    )
-            except ServiceError:
-                raise
-            except Exception as exc:
-                logger.error("Falha ao atualizar índice: %s", type(exc).__name__)
-                raise ServiceError("Não foi possível atualizar o índice vetorial.", 503) from None
+            raise ServiceError("Quantidade de chunks e embeddings incompatível.", 422)
+        for vector in embeddings:
+            self.validate_vector(vector)
+        with transaction.atomic():
+            document = Documento.objects.select_for_update().only("treinamento_id").get(pk=document_id)
+            if document.treinamento_id != metadata["treinamento_id"]:
+                raise ServiceError("Documento não pertence ao treinamento informado.", 422)
+            DocumentoTrecho.objects.filter(documento_id=document_id).delete()
+            DocumentoTrecho.objects.bulk_create([
+                DocumentoTrecho(documento_id=document_id, ordem=i, texto=chunk.text, pagina=chunk.page,
+                               secao=chunk.section, embedding=vector, embedding_model=self.settings.embedding_model,
+                               dimensions=self.settings.embedding_dimensions)
+                for i, (chunk, vector) in enumerate(zip(chunks, embeddings, strict=True))
+            ], batch_size=100)
 
-    def remove_document(self, document_id: int) -> None:
-        with self.lock:
-            try:
-                self.collection.delete(where={"documento_id": document_id})
-            except ServiceError:
-                raise
-            except Exception as exc:
-                logger.error("Falha ao remover índice: %s", type(exc).__name__)
-                raise ServiceError("Não foi possível remover o documento do índice.", 503) from None
-
-    def search(self, embedding: list[float], training_id: int, document_ids: list[int], top_k: int = 5) -> list[SearchHit]:
+    def search(self, embedding, training_id, document_ids, top_k=5):
         if not document_ids:
             return []
-        with self.lock:
-            try:
-                result = self.collection.query(
-                    query_embeddings=[embedding], n_results=top_k,
-                    where={"$and": [{"treinamento_id": training_id}, {"documento_id": {"$in": document_ids}}]},
-                    include=["documents", "metadatas", "distances"],
-                )
-                return [SearchHit(text, metadata, distance) for text, metadata, distance in zip(
-                    result["documents"][0], result["metadatas"][0], result["distances"][0], strict=True
-                )]
-            except ServiceError:
-                raise
-            except Exception as exc:
-                logger.error("Falha ao consultar índice: %s", type(exc).__name__)
-                raise ServiceError("Não foi possível consultar o índice vetorial.", 503) from None
+        self.validate_vector(embedding)
+        chunks = DocumentoTrecho.objects.filter(documento__treinamento_id=training_id,
+                                                documento_id__in=document_ids, documento__processado=True)
+        if chunks.exclude(embedding_model=self.settings.embedding_model, dimensions=self.settings.embedding_dimensions).exists():
+            raise ServiceError("Os documentos usam outro modelo ou dimensão. Reindexe os documentos do treinamento.", 409)
+        nearest = chunks.annotate(distance=CosineDistance("embedding", embedding)).order_by("distance", "pk").select_related(
+            "documento__treinamento__setor"
+        ).defer("embedding", "documento__arquivo")[:top_k]
+        return [SearchHit(chunk.texto, {
+            "documento_id": chunk.documento_id, "documento": chunk.documento.nome,
+            "treinamento_id": training_id, "setor": chunk.documento.treinamento.setor.nome,
+            "pagina": chunk.pagina, "secao": chunk.secao,
+        }, float(chunk.distance)) for chunk in nearest]

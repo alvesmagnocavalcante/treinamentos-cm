@@ -1,3 +1,5 @@
+from io import BytesIO
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
@@ -13,13 +15,11 @@ from app.models import Documento, Treinamento
 from app.services.errors import ServiceError
 from app.services.drive import DriveClient
 from app.services.drive_sync import DriveSyncService
-from app.services.ingest import stored_file_exists, stored_path
+from app.services.document_files import document_path
 
 
 def render_documents(request, training, error=None):
-    documents = list(training.documentos.all())
-    for document in documents:
-        document.arquivo_disponivel = stored_file_exists(settings.SERVICE_SETTINGS.documents_path, document.caminho)
+    documents = list(training.documentos.defer("arquivo"))
     response = render(request, "admin_documentos.html", {
         "treinamento": training, "documentos": documents, "erro": str(error) if error else None,
         "max_upload_mb": settings.SERVICE_SETTINGS.max_upload_bytes // (1024 * 1024),
@@ -107,6 +107,10 @@ def download(request, document_id):
     document = get_object_or_404(Documento.objects.select_related("treinamento"), pk=document_id)
     if not document.treinamento.ativo and not request.user.has_perm("app.view_documento"):
         raise Http404("Documento não encontrado.")
-    path = stored_path(settings.SERVICE_SETTINGS.documents_path, document.caminho)
-    media = "application/pdf" if document.tipo == "pdf" else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    return FileResponse(path.open("rb"), as_attachment=True, filename=document.nome, content_type=media)
+    with document_path(document, settings.SERVICE_SETTINGS) as path:
+        # A origem temporária é removida antes da resposta; o buffer pertence ao FileResponse.
+        stream = BytesIO(path.read_bytes())
+        media = "application/pdf" if path.suffix == ".pdf" else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    response = FileResponse(stream, as_attachment=True, filename=document.nome, content_type=media)
+    response["Cache-Control"] = "private, no-store"
+    return response

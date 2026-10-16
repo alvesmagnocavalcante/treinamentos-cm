@@ -30,11 +30,11 @@
   {% for documento in documentos %}
     <tr>
       <td>{{ documento.nome }}{% if documento.drive_file_id %} <span class="badge text-bg-secondary">Drive</span>{% endif %}<br><small>ID {{ documento.id }} · {{ documento.criado_em.strftime('%d/%m/%Y %H:%M') }} UTC</small></td>
-      <td>{% if not documento.arquivo_disponivel %}<span class="text-danger">Arquivo ausente — envie novamente</span>{% else %}{{ 'Indexado' if documento.processado else 'Pendente' }}{% endif %}</td>
+      <td>{{ 'Indexado' if documento.processado else 'Pendente' }}</td>
       <td>
         <div class="d-flex flex-wrap gap-2">
-          {% if documento.arquivo_disponivel and treinamento.ativo %}<a class="btn btn-sm btn-outline-secondary" href="/documentos/{{ documento.id }}/arquivo">Baixar</a>{% endif %}
-          {% if pode_reindexar and documento.arquivo_disponivel %}<form method="post" action="/admin/documentos/{{ documento.id }}/reindexar">{{ csrf_input }}<button class="btn btn-sm btn-outline-dark">Reindexar</button></form>{% endif %}
+          {% if treinamento.ativo %}<a class="btn btn-sm btn-outline-secondary" href="/documentos/{{ documento.id }}/arquivo">Baixar</a>{% endif %}
+          {% if pode_reindexar %}<form method="post" action="/admin/documentos/{{ documento.id }}/reindexar">{{ csrf_input }}<button class="btn btn-sm btn-outline-dark">Reindexar</button></form>{% endif %}
           {% if pode_excluir %}<form method="post" action="/admin/documentos/{{ documento.id }}/excluir" data-delete-form>{{ csrf_input }}<button class="btn btn-sm btn-outline-danger">Excluir</button></form>{% endif %}
         </div>
       </td>

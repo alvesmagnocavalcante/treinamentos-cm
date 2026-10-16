@@ -7,7 +7,7 @@ from docx import Document
 
 from app.services.chunking import chunk_sections
 from app.services.errors import ServiceError
-from app.services.ingest import TextSection, extract_text, save_upload, stored_path
+from app.services.ingest import TextSection, extract_text, save_upload
 
 
 def pdf_bytes(text="DEMONSTRACAO FICTICIA. Consulte a disponibilidade para early check-in."):
@@ -92,9 +92,8 @@ def test_upload_name_and_path_are_safe(tmp_path):
     path, name = save_upload(upload, tmp_path, 100000)
     assert name == "POP_EARLY_CHECKIN.pdf"
     assert path.name != name
-    assert stored_path(tmp_path, path.name) == path.resolve()
-    with pytest.raises(ServiceError):
-        stored_path(tmp_path, "../outside.pdf")
+    assert path.parent == tmp_path
+    assert path.suffix == ".pdf"
 
 
 def test_empty_pdf_and_invalid_docx_container(tmp_path):

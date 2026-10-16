@@ -9,9 +9,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 @dataclass(frozen=True)
 class Settings:
-    database_path: Path
-    documents_path: Path = ROOT / "media/documentos"
-    vector_path: Path = ROOT / "vector_db"
+    database_url: str = field(default="", repr=False)
     google_api_key: str = field(default="", repr=False)
     embedding_model: str = "models/gemini-embedding-001"
     embedding_dimensions: int = 768
@@ -34,23 +32,13 @@ class Settings:
     @classmethod
     def from_env(cls) -> "Settings":
         load_dotenv(ROOT / ".env")
-        def path(name: str, default: str) -> Path:
-            value = Path(os.getenv(name, default))
-            return value if value.is_absolute() else ROOT / value
-
-        model = os.getenv("OPENROUTER_MODEL", "openrouter/free").strip()
-        # Compatibilidade com IDs usados pelo antigo adaptador de agentes.
-        if model.startswith("openrouter/") and "/" in model.removeprefix("openrouter/"):
-            model = model.removeprefix("openrouter/")
         return cls(
-            database_path=path("DJANGO_DATABASE_PATH", "app/database/platform.sqlite3"),
-            documents_path=path("DOCUMENTS_PATH", "media/documentos"),
-            vector_path=path("VECTOR_DB_PATH", "vector_db"),
+            database_url=os.getenv("DATABASE_URL", "").strip(),
             google_api_key=os.getenv("GOOGLE_API_KEY", "").strip(),
             embedding_model=os.getenv("GEMINI_EMBEDDING_MODEL", "models/gemini-embedding-001").strip(),
             embedding_dimensions=int(os.getenv("GEMINI_EMBEDDING_DIMENSIONS", "768")),
             openrouter_api_key=os.getenv("OPENROUTER_API_KEY", "").strip(),
-            openrouter_model=model,
+            openrouter_model=os.getenv("OPENROUTER_MODEL", "openrouter/free").strip(),
             timeout_seconds=float(os.getenv("HTTP_TIMEOUT_SECONDS", "60")),
             max_upload_bytes=int(os.getenv("MAX_UPLOAD_MB", "10")) * 1024 * 1024,
             chunk_tokens=int(os.getenv("CHUNK_TOKENS", "1000")),

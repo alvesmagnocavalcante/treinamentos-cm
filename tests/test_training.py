@@ -49,7 +49,7 @@ def test_admin_registered_models_and_forms(staff_client):
 
 
 def test_multiple_lessons_keep_training_rag_scope(employee_client, training):
-    first = Aula.objects.create(treinamento=training, titulo="Introdução", ordem=1, conteudo="Explicação da primeira aula.")
+    Aula.objects.create(treinamento=training, titulo="Introdução", ordem=1, conteudo="Explicação da primeira aula.")
     second = Aula.objects.create(treinamento=training, titulo="Disponibilidade", ordem=2, video_url="https://drive.google.com/file/d/video-two/view")
     hidden = Aula.objects.create(treinamento=training, titulo="Rascunho confidencial", ordem=3, ativo=False)
     page = employee_client.get(f"/treinamentos/{training.pk}")
@@ -108,22 +108,13 @@ def test_lesson_validation_and_unique_order(training):
 
 
 def test_parent_deletion_does_not_orphan_documents(training):
-    Documento.objects.create(treinamento=training,nome="POP.pdf",caminho="file.pdf",tipo="pdf")
+    Documento.objects.create(treinamento=training,nome="POP.pdf",arquivo=b"test-pdf",tipo="pdf")
     with pytest.raises(ProtectedError):
         training.delete()
     with pytest.raises(ProtectedError):
         training.setor.delete()
 
 
-def test_missing_original_is_not_exposed_or_used_in_rag(staff_client,training,platform_settings):
-    document = Documento.objects.create(treinamento=training,nome="Ausente.pdf",caminho="missing.pdf",tipo="pdf",processado=True)
-    page = staff_client.get(f"/treinamentos/{training.pk}").content.decode()
-    assert f'href="/documentos/{document.pk}/arquivo"' not in page
-    status = staff_client.get(f"/admin/treinamentos/{training.pk}/documentos").content.decode()
-    assert "Arquivo ausente" in status
-    response = staff_client.post(f"/treinamentos/{training.pk}/perguntar",{"pergunta":"Como proceder?"},content_type="application/json")
-    assert response.status_code == 409
-    assert "indexação" in response.json()["detail"]
 
 
 def test_staff_needs_explicit_document_permissions(client,django_user_model,training):

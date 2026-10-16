@@ -15,11 +15,11 @@ def prevent_paid_http_calls(monkeypatch):
 
 
 @pytest.fixture
-def platform_settings(tmp_path, settings, monkeypatch):
+def platform_settings(settings, monkeypatch):
     from app import runtime
     from app.services.vector_store import VectorStore
 
-    config = Settings(tmp_path / "platform.sqlite3", documents_path=tmp_path / "documents", vector_path=tmp_path / "vectors")
+    config = Settings()
     settings.SERVICE_SETTINGS = config
     monkeypatch.setattr(runtime, "store", VectorStore(config))
     return config

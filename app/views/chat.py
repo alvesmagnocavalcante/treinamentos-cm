@@ -1,6 +1,5 @@
 import json
 
-from django.conf import settings
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_POST
@@ -8,7 +7,6 @@ from django.views.decorators.http import require_POST
 from app import runtime
 from app.models import Documento, Treinamento
 from app.services.errors import ServiceError
-from app.services.ingest import stored_file_exists
 
 
 @require_POST
@@ -28,11 +26,7 @@ def ask(request, training_id):
     if not 1 <= len(question) <= 2000:
         return JsonResponse({"detail": "A pergunta deve ter entre 1 e 2000 caracteres."}, status=422)
     with runtime.document_lock:
-        indexed = Documento.objects.filter(treinamento=training, processado=True).only("pk", "caminho")
-        ids = [
-            document.pk for document in indexed
-            if stored_file_exists(settings.SERVICE_SETTINGS.documents_path, document.caminho)
-        ]
+        ids = list(Documento.objects.filter(treinamento=training, processado=True).values_list("pk", flat=True))
         if not ids:
             raise ServiceError(
                 "Os materiais deste treinamento ainda não estão disponíveis para o assistente. "
