@@ -193,3 +193,18 @@ migrações, redirecionamento HTTPS, login, proteção CSRF, Admin e entrega dos
 da página de entrada. A suíte existente passou com 197 testes. O Aiven e suas
 credenciais não foram alterados, e não houve publicação no Render nesta etapa.
 O procedimento completo está em [Docker e Render](DOCKER.md).
+
+## 11. Publicação no Render Free — 16/10/2026
+
+O serviço `treinamentos-carmel` foi publicado no workspace Projetos, região
+Virginia, plano Free, usando o Dockerfile do repositório e a branch `main`.
+O endereço é https://treinamentos-carmel.onrender.com. O build automático está
+habilitado para novos commits. Não foi criado outro banco nem disco persistente.
+
+Foram reaproveitados a conexão Aiven, os modelos de IA e as chaves existentes.
+Foi gerada uma chave Django exclusiva para a hospedagem. A conta de serviço
+do Drive foi configurada como JSON na variável protegida
+`GOOGLE_SERVICE_ACCOUNT_JSON`, porque o conector não oferece envio de Secret Files.
+O suporte ao arquivo/ADC foi preservado, e erros de JSON omitem o conteúdo secreto.
+Antes da publicação, a suíte passou com 202 testes. As migrações no Aiven já
+estavam atualizadas e o Gunicorn iniciou corretamente no Render.

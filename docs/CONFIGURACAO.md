@@ -221,6 +221,7 @@ Valores abaixo são padrões do código ou exemplos, não credenciais reais.
 | `DATABASE_URL` | Obrigatória | Conexão PostgreSQL; sem ela a aplicação informa erro de configuração |
 | `DATABASE_SSL_ROOT_CERT` | Vazio | Caminho da CA; ativa verificação TLS completa |
 | `GOOGLE_APPLICATION_CREDENTIALS` | Sem valor obrigatório no código | Caminho do JSON/credencial ADC para o Drive |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | Vazio | Alternativa de hospedagem: JSON completo como segredo; tem prioridade sobre ADC/arquivo |
 | `GOOGLE_API_KEY` | Vazio | Acesso à API de embeddings do Google |
 | `GEMINI_EMBEDDING_MODEL` | `models/gemini-embedding-001` | Modelo que gera os vetores |
 | `GEMINI_EMBEDDING_DIMENSIONS` | `768` | Quantidade de números por embedding |

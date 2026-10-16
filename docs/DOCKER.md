@@ -1,5 +1,19 @@
 # Docker e Render
 
+## Demonstração publicada
+
+- Endereço: https://treinamentos-carmel.onrender.com
+- Painel: https://dashboard.render.com/web/srv-db96avvbtjjs73fgqh50
+- Workspace: Projetos; região: Virginia; plano: Free.
+- Repositório: `alvesmagnocavalcante/treinamentos-cm`, branch `main`.
+- Deploy automático habilitado: novos pushes em `main` iniciam um build.
+- O banco Aiven e os usuários existentes foram mantidos.
+- O Drive usa `GOOGLE_SERVICE_ACCOUNT_JSON` nas variáveis protegidas do Render.
+- A chave Django é exclusiva da hospedagem; `DJANGO_DEBUG=false`.
+
+As credenciais não estão no código nem na imagem. Para alterá-las, use a seção
+Environment do serviço e aguarde o redeploy. O `.env` do computador não é enviado.
+
 ## 1. O que a imagem executa
 
 A imagem usa Python 3.12, dependências do `uv.lock`, Gunicorn com um processo e

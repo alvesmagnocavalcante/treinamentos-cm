@@ -105,3 +105,5 @@ de IA. Antes de executar `pytest`, inicie o contêiner descrito no
 ## Docker
 
 A imagem de produção está no `Dockerfile`. Consulte o [guia Docker e Render](docs/DOCKER.md) para executar e configurar as credenciais na hospedagem.
+
+Demonstração: [treinamentos-carmel.onrender.com](https://treinamentos-carmel.onrender.com).
