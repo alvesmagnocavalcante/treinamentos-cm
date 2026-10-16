@@ -101,3 +101,7 @@ uv run pytest -q
 Os testes usam PostgreSQL descartável com `pgvector` e bloqueiam chamadas externas
 de IA. Antes de executar `pytest`, inicie o contêiner descrito no
 [procedimento completo](docs/MANUTENCAO.md). Não aponte os testes para o banco de uso.
+
+## Docker
+
+A imagem de produção está no `Dockerfile`. Consulte o [guia Docker e Render](docs/DOCKER.md) para executar e configurar as credenciais na hospedagem.

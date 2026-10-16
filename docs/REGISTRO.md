@@ -175,3 +175,21 @@ As páginas da aplicação e do Admin passaram a usar o símbolo oficial Carmel
 como favicon PNG, com versão branca para a preferência escura do navegador.
 Os títulos das abas do catálogo e treinamento também passaram a identificar
 Carmel Hotéis. Os arquivos de marca existentes foram reutilizados.
+
+## 10. Imagem Docker para hospedagem
+
+Foi adicionado um Dockerfile com Python 3.12, instalação das dependências do lock
+em estágio separado, Gunicorn e WhiteNoise. A imagem final executa sem root e
+não contém `.env`, credenciais locais, Git, testes ou ferramentas de desenvolvimento.
+Os estáticos são coletados no build, sem acesso ao Aiven ou às APIs.
+
+O entrypoint aplica as migrações antes de iniciar um processo com quatro threads
+na porta `PORT`. O módulo `config.production` configura o proxy HTTPS do Render,
+cookies seguros, hostname e CSRF; o desenvolvimento mantém `config.settings`.
+O Drive continua usando ADC/arquivo JSON, montado como Secret File na hospedagem.
+
+A imagem foi construída e executada com PostgreSQL descartável. Foram validados
+migrações, redirecionamento HTTPS, login, proteção CSRF, Admin e entrega dos assets
+da página de entrada. A suíte existente passou com 197 testes. O Aiven e suas
+credenciais não foram alterados, e não houve publicação no Render nesta etapa.
+O procedimento completo está em [Docker e Render](DOCKER.md).

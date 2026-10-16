@@ -183,61 +183,13 @@ com a extensão `vector` e use `pg_restore` conforme as permissões desse ambien
 Sem backup do índice, os arquivos do Drive podem ser reindexados, com consumo
 das APIs. Isso não recria usuários, aulas e permissões perdidos.
 
-## 6. Preparação para publicar no Render
+## 6. Docker e Render
 
-**Status desta implementação: banco remoto funcionando; publicação não executada.**
-O projeto ainda não contém a preparação completa de execução em produção:
-Gunicorn/WhiteNoise não estão nas dependências e não há configuração de deploy
-finalizada. Não use `runserver` como comando de produção.
-
-### Configurações já compatíveis
-
-O banco e os arquivos temporários já permitem que os dados persistentes fiquem
-fora da instância. Configure no serviço Render:
-
-| Configuração | Valor/origem |
-|---|---|
-| `DATABASE_URL` | URI completa do banco `treinamentos` no Aiven |
-| `GOOGLE_APPLICATION_CREDENTIALS` | `/etc/secrets/google-drive.json` |
-| Secret File `google-drive.json` | Conteúdo do JSON da conta de serviço |
-| `DATABASE_SSL_ROOT_CERT` | Opcional: `/etc/secrets/aiven-ca.pem` com a CA como Secret File |
-| `GOOGLE_API_KEY` | Chave de embeddings |
-| `OPENROUTER_API_KEY` | Chave do OpenRouter |
-| Modelos e dimensões | Mesmos valores compatíveis com os documentos já indexados |
-| `DJANGO_DEBUG` | `false` |
-| `DJANGO_SECRET_KEY` | Valor forte, fixo e secreto, exclusivo do ambiente |
-| `DJANGO_ALLOWED_HOSTS` | Host `SEU-SERVICO.onrender.com` e domínio próprio, se houver |
-
-O Render disponibiliza Secret Files em `/etc/secrets/NOME_DO_ARQUIVO`.
-Não envie o JSON ao Git e não copie o caminho Windows para o servidor.
-[Configuração oficial de variáveis e arquivos secretos](https://render.com/docs/configure-environment-variables).
-
-### Trabalho que falta antes de publicar
-
-1. Adicionar/configurar um servidor WSGI de produção, como Gunicorn, usando
-   `config.wsgi:application` e a porta `$PORT` da hospedagem.
-2. Configurar distribuição dos estáticos, por exemplo WhiteNoise, e `collectstatic`.
-   Esse comando sozinho não faz o servidor entregar CSS, fontes e JavaScript.
-3. Definir e validar os comandos de build, migração e início do serviço.
-4. Configurar HTTPS/proxy e verificar cookies, login, logout e CSRF no domínio real.
-   Não há variável `DJANGO_CSRF_TRUSTED_ORIGINS` implementada neste projeto; se
-   precisar dela, será necessário adicionar a configuração ao Django.
-5. Começar com um processo da aplicação e validar memória, concorrência, limite
-   de conexões e duração das sincronizações. O lock atual é por processo, não é
-   um coordenador entre múltiplas instâncias.
-6. Verificar backup, credenciais, acesso ao Drive e um fluxo real de chat no deploy.
-
-O [guia oficial de Django no Render](https://render.com/docs/deploy-django)
-descreve a preparação de estáticos e inicialização. A criação de outro banco no
-Render não é necessária se a aplicação continuar usando o Aiven configurado.
-
-Não é necessário disco persistente para os documentos e o índice no modo
-PostgreSQL atual. Isso não significa hospedagem sem limites ou sem custos:
-há consumo de memória temporária, banco, APIs e tráfego, inclusive do vídeo.
-
-No Cloud Run, o mesmo banco externo pode ser usado, mas credenciais, contêiner,
-porta e configuração de produção também precisam ser preparados. Não houve
-deploy no Cloud Run durante esta implementação.
+O Dockerfile e o procedimento de deploy estão no [guia Docker](DOCKER.md).
+A imagem inclui Gunicorn, WhiteNoise e coleta de estáticos no build.
+As migrações são aplicadas ao iniciar; o banco continua externo no Aiven.
+A configuração local permanece em `config.settings`, e o contêiner utiliza
+`config.production`. Nenhum segredo deve entrar no build ou no Git.
 
 ## 7. Limites atuais e cuidados ao evoluir
 

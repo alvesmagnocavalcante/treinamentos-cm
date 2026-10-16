@@ -1,0 +1,17 @@
+*
+!pyproject.toml
+!uv.lock
+!manage.py
+!Dockerfile
+!app/
+!app/**
+!config/
+!config/**
+!docker/
+!docker/entrypoint.sh
+**/__pycache__/
+**/*.pyc
+**/.env*
+**/*.sqlite3
+**/*.pem
+**/*.key

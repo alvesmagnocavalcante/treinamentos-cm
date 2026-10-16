@@ -1,6 +1,7 @@
 """Leitura autenticada do Drive; não altera arquivos nem permissões na origem."""
 
 import json
+import os
 import re
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -11,6 +12,7 @@ import google.auth
 import requests
 from google.auth.exceptions import GoogleAuthError
 from google.auth.transport.requests import AuthorizedSession
+from google.oauth2.service_account import Credentials
 
 from app.services.errors import ServiceError
 
@@ -71,7 +73,17 @@ class DriveClient:
     @contextmanager
     def connect(cls, settings):
         try:
-            credentials, _ = google.auth.default(scopes=[SCOPE])
+            credential_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "").strip()
+            if credential_json:
+                try:
+                    info = json.loads(credential_json)
+                    if not isinstance(info, dict):
+                        raise ValueError
+                    credentials = Credentials.from_service_account_info(info, scopes=[SCOPE])
+                except (ValueError, TypeError, KeyError):
+                    raise ServiceError("As credenciais do Google Drive estão inválidas. Confira a configuração do serviço.", 503) from None
+            else:
+                credentials, _ = google.auth.default(scopes=[SCOPE])
             with AuthorizedSession(credentials, refresh_timeout=settings.timeout_seconds) as session:
                 yield cls(session, settings.timeout_seconds, settings.max_upload_bytes)
         except GoogleAuthError:
