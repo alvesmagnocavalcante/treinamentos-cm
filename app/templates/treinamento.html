@@ -1,30 +1,88 @@
-{% extends "base.html" %}
+{% extends "learner_base.html" %}
+{% from "_icons.html" import icon %}
 {% block title %}{{ treinamento.titulo }} · Treinamento interno{% endblock %}
 {% block content %}
-<p class="text-muted">{{ treinamento.setor.nome }}</p>
-<h1>{{ treinamento.titulo }}</h1>
-<p>{{ treinamento.descricao }}</p>
-{% if treinamento.conteudo %}<section class="card card-body mb-4 training-content">{{ treinamento.conteudo }}</section>{% endif %}
-<h2 class="h4">Documentos</h2>
-<ul>
-{% for documento in treinamento.documentos %}
-  <li><a href="/documentos/{{ documento.id }}/arquivo">{{ documento.nome }}</a> — {{ 'Processado' if documento.processado else 'Pendente de processamento' }}</li>
-{% else %}<li>Nenhum documento cadastrado.</li>{% endfor %}
-</ul>
-<p><a href="/admin/treinamentos/{{ treinamento.id }}/documentos">Gerenciar documentos</a></p>
-<section class="card card-body mt-4" aria-labelledby="assistant-title">
-  <div class="d-flex justify-content-between align-items-center gap-3">
-    <h2 class="h4" id="assistant-title">Assistente de treinamento</h2>
-    <button id="clear-chat" type="button" class="btn btn-sm btn-outline-secondary">Limpar conversa</button>
+<div class="training-heading">
+  <a class="back-link" href="/">{{ icon('arrow-left', 16) }} Todos os treinamentos</a>
+  <div class="training-eyebrow"><span class="sector-pill">{{ treinamento.setor.nome }}</span><span>ESPAÇO DE APRENDIZADO</span></div>
+  <h1>{{ treinamento.titulo }}</h1>
+  {% if treinamento.descricao %}<p class="training-description">{{ treinamento.descricao }}</p>{% endif %}
+</div>
+
+<div class="learning-workspace">
+  <div class="lesson-column">
+    {% if treinamento.publicadas | length > 1 %}
+    <nav class="lesson-list-card" aria-label="Aulas do treinamento">
+      <div class="section-heading"><h2>Aulas do treinamento</h2><span class="count-badge">{{ treinamento.publicadas | length }}</span></div>
+      <ol class="lesson-list">
+      {% for aula in treinamento.publicadas %}
+        <li><a href="{{ url('training', args=[treinamento.id]) }}?aula={{ aula.id }}" {% if aula.id == aula_atual.id %}aria-current="page"{% endif %}><span class="lesson-order">{{ loop.index }}</span><span>{{ aula.titulo }}</span>{{ icon('play' if aula.video_url else 'document', 16) }}</a></li>
+      {% endfor %}
+      </ol>
+    </nav>
+    {% endif %}
+    <section class="lesson-card" aria-labelledby="video-title">
+      <div class="section-heading"><h2 id="video-title">{{ aula_atual.titulo if aula_atual else 'Seu treinamento' }}</h2>{% if video_preview_url %}<span class="section-label">VÍDEO</span>{% endif %}</div>
+      {% if video_preview_url %}
+      <div class="lesson-media">
+        <iframe src="{{ video_preview_url }}" title="Vídeo: {{ treinamento.titulo }}" referrerpolicy="no-referrer" allowfullscreen></iframe>
+      </div>
+      <div class="video-caption"><span>Assista no seu ritmo.</span><a href="{{ aula_atual.video_url }}" target="_blank" rel="noopener noreferrer">Abrir no Google Drive {{ icon('external', 13) }}</a></div>
+      {% else %}
+      {% if not aula_atual or not aula_atual.conteudo %}<div class="video-empty"><span class="video-empty-icon">{{ icon('book', 24) }}</span><p>Explore os materiais do treinamento.</p><span>Consulte os documentos e tire suas dúvidas com o assistente.</span></div>{% endif %}
+      {% endif %}
+      {% if aula_atual and aula_atual.conteudo %}<details class="lesson-notes" {% if not video_preview_url %}open{% endif %}><summary>Ler explicação da aula {{ icon('chevron', 14) }}</summary><div class="training-content">{{ aula_atual.conteudo }}</div></details>{% endif %}
+    </section>
+
+    <details class="materials-card" aria-labelledby="materials-title">
+      <summary class="section-heading materials-toggle"><h2 id="materials-title">Materiais de apoio</h2><span class="count-badge">{{ treinamento.materiais | length }}</span>{{ icon('chevron', 15) }}</summary>
+      <div class="materials-list">
+        {% for documento in treinamento.materiais %}
+        <a class="material-link" href="/documentos/{{ documento.id }}/arquivo" target="_blank" rel="noopener noreferrer" title="{{ documento.nome }}">
+          <span class="document-icon">{{ icon('document', 20) }}</span>
+          <span class="material-info"><span class="material-name">{{ documento.nome }}</span><span class="material-type">{{ documento.tipo | upper }} · Abrir documento</span></span>
+          {{ icon('external', 15) }}
+        </a>
+        {% else %}<p class="materials-empty">Nenhum material disponível.</p>{% endfor %}
+      </div>
+    </details>
+    <p class="lesson-hint">{{ icon('sparkles', 16) }} Ficou com alguma dúvida? Converse com o assistente.</p>
   </div>
-  <p class="text-muted small">Respostas baseadas nos documentos indexados deste treinamento. Confira os trechos nas fontes.</p>
-  <div id="chat-history" class="chat-history mb-3" role="log" aria-live="polite"></div>
-  <form id="chat-form" data-training-id="{{ treinamento.id }}">
-    <label for="pergunta" class="form-label">Sua pergunta</label>
-    <textarea id="pergunta" name="pergunta" class="form-control mb-2" rows="2" maxlength="2000" required></textarea>
-    <button class="btn btn-dark" type="submit">Enviar pergunta</button>
-    <span id="chat-status" class="small ms-2" role="status"></span>
-  </form>
-</section>
-<script src="{{ url_for('static', path='/chat.js') }}" defer></script>
+
+  <section class="assistant-card" aria-labelledby="assistant-title">
+    <header class="assistant-header">
+      <span class="assistant-avatar">{{ icon('sparkles', 22) }}</span>
+      <div class="assistant-heading"><h2 id="assistant-title">Seu assistente de aprendizado</h2><p><span class="status-dot"></span> Respostas com base nos materiais</p></div>
+      <button id="clear-chat" type="button" class="icon-button" aria-label="Limpar conversa" title="Limpar conversa">{{ icon('reset', 18) }}</button>
+    </header>
+
+    <div id="chat-history" class="chat-history" role="log" aria-live="polite" aria-label="Conversa sobre o treinamento">
+      <div id="chat-empty" class="chat-empty">
+        <span class="welcome-icon">{{ icon('sparkles', 30) }}</span>
+        <span class="welcome-eyebrow">APRENDER É CONVERSAR</span>
+        <h3>Vamos entender melhor?</h3>
+        <p>Pergunte sobre o treinamento.<br>Estou aqui para ajudar você a colocar em prática.</p>
+        <div class="question-suggestions" aria-label="Sugestões de perguntas">
+          <button type="button" data-question="Quais são as principais etapas deste procedimento?">Quais são as principais etapas? {{ icon('arrow-right', 16) }}</button>
+          <button type="button" data-question="Quais cuidados devo ter ao realizar este procedimento?">Quais cuidados devo ter? {{ icon('arrow-right', 16) }}</button>
+          <button type="button" data-question="Resuma as orientações deste treinamento.">Resuma as orientações para mim {{ icon('arrow-right', 16) }}</button>
+        </div>
+      </div>
+      <div id="chat-messages" class="chat-messages"></div>
+    </div>
+
+    <div class="composer-area">
+      <p id="chat-status" class="chat-status" role="status"></p>
+      <form id="chat-form" class="chat-composer" data-training-id="{{ treinamento.id }}" data-user-id="{{ request.user.id }}">
+        {{ csrf_input }}
+        <label for="pergunta" class="visually-hidden">Sua pergunta sobre o treinamento</label>
+        <textarea id="pergunta" name="pergunta" rows="1" maxlength="2000" placeholder="Escreva sua dúvida aqui…" required aria-describedby="composer-help"></textarea>
+        <button class="send-button" type="submit" aria-label="Enviar pergunta" title="Enviar pergunta" disabled>{{ icon('send', 21) }}</button>
+      </form>
+      <div class="composer-footnote"><span id="composer-help">Confira as fontes antes de aplicar o procedimento.</span><span class="keyboard-hint">Enter para enviar</span></div>
+    </div>
+    <noscript><p class="materials-empty">Ative o JavaScript para conversar com o assistente.</p></noscript>
+  </section>
+</div>
+<script src="{{ static('chat.js') }}" defer></script>
 {% endblock %}

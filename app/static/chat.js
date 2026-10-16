@@ -1,9 +1,15 @@
 "use strict";
 const form = document.getElementById("chat-form");
-const history = document.getElementById("chat-history");
+const chatHistory = document.getElementById("chat-history");
+const messageList = document.getElementById("chat-messages");
+const emptyState = document.getElementById("chat-empty");
 const statusLabel = document.getElementById("chat-status");
-const storageKey = `training-chat-${form.dataset.trainingId}`;
+const questionInput = form.elements.pergunta;
+const sendButton = form.querySelector('button[type="submit"]');
+const clearButton = document.getElementById("clear-chat");
+const storageKey = `training-chat-${form.dataset.userId}-${form.dataset.trainingId}`;
 let messages = [];
+let busy = false;
 try {
   const saved = JSON.parse(sessionStorage.getItem(storageKey) || "[]");
   if (Array.isArray(saved)) messages = saved.filter(item =>
@@ -17,46 +23,61 @@ function persist() {
 }
 
 function render() {
-  history.replaceChildren();
+  messageList.replaceChildren();
+  emptyState.hidden = messages.length > 0;
   for (const message of messages) {
     const article = document.createElement("article");
-    article.className = "chat-message border rounded p-3 mb-2";
-    const author = document.createElement("strong");
+    article.className = `chat-message chat-message-${message.role}`;
+    const author = document.createElement("span");
+    author.className = "message-author";
     author.textContent = message.role === "user" ? "Você" : "Assistente";
     const text = document.createElement("p");
-    text.className = "training-content mb-0 mt-1";
+    text.className = "message-text training-content";
     text.textContent = message.text;
     article.append(author, text);
     for (const source of Array.isArray(message.sources) ? message.sources : []) {
+      if (!source || typeof source !== "object") continue;
       const details = document.createElement("details");
+      details.className = "chat-source";
       const summary = document.createElement("summary");
       summary.textContent = `[${source.id}] ${source.documento}${source.pagina ? ` · Página ${source.pagina}` : ` · ${source.secao || "Seção"}`}`;
       const quote = document.createElement("p");
-      quote.className = "training-content small mt-2";
+      quote.className = "training-content";
       quote.textContent = source.trecho;
       details.append(summary, quote);
       article.append(details);
     }
-    history.append(article);
+    messageList.append(article);
   }
-  history.scrollTop = history.scrollHeight;
+  chatHistory.scrollTop = chatHistory.scrollHeight;
+}
+
+function updateComposer() {
+  questionInput.style.height = "auto";
+  questionInput.style.height = `${Math.min(questionInput.scrollHeight, 120)}px`;
+  sendButton.disabled = busy || !questionInput.value.trim();
 }
 
 form.addEventListener("submit", async event => {
   event.preventDefault();
-  const question = form.elements.pergunta.value.trim();
-  if (!question) return;
-  const button = form.querySelector("button");
-  button.disabled = true;
-  statusLabel.textContent = "Consultando documentos…";
+  const question = questionInput.value.trim();
+  if (!question || busy) return;
+  busy = true;
+  clearButton.disabled = true;
+  statusLabel.classList.remove("is-error");
+  statusLabel.textContent = "Consultando os materiais…";
   messages.push({role: "user", text: question});
   persist();
   render();
-  form.elements.pergunta.value = "";
+  questionInput.value = "";
+  updateComposer();
   try {
     const response = await fetch(`/treinamentos/${form.dataset.trainingId}/perguntar`, {
-      method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({pergunta: question})
+      method: "POST", headers: {"Content-Type": "application/json", "X-CSRFToken": form.elements.csrfmiddlewaretoken.value}, body: JSON.stringify({pergunta: question})
     });
+    if (!response.headers.get("content-type")?.includes("application/json")) {
+      throw new Error("Não foi possível consultar os materiais. Atualize a página e confira sua sessão.");
+    }
     const data = await response.json();
     if (!response.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Não foi possível consultar os documentos.");
     messages.push({role: "assistant", text: data.resposta, sources: data.fontes});
@@ -64,15 +85,38 @@ form.addEventListener("submit", async event => {
     persist();
     render();
   } catch (error) {
+    statusLabel.classList.add("is-error");
     statusLabel.textContent = error instanceof TypeError ? "Falha de conexão. Tente novamente." : error.message;
+    if (!questionInput.value.trim()) questionInput.value = question;
   } finally {
-    button.disabled = false;
-    form.elements.pergunta.focus();
+    busy = false;
+    clearButton.disabled = false;
+    updateComposer();
+    questionInput.focus({preventScroll: true});
   }
 });
-document.getElementById("clear-chat").addEventListener("click", () => {
+
+clearButton.addEventListener("click", () => {
+  if (busy) return;
   messages = [];
+  statusLabel.textContent = "";
+  statusLabel.classList.remove("is-error");
   persist();
   render();
 });
+document.querySelectorAll("[data-question]").forEach(button => {
+  button.addEventListener("click", () => {
+    questionInput.value = button.dataset.question;
+    updateComposer();
+    questionInput.focus({preventScroll: true});
+  });
+});
+questionInput.addEventListener("input", updateComposer);
+questionInput.addEventListener("keydown", event => {
+  if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+    event.preventDefault();
+    if (!sendButton.disabled) form.requestSubmit();
+  }
+});
 render();
+updateComposer();

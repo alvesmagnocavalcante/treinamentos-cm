@@ -2,19 +2,26 @@ import re
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol
 from uuid import uuid4
 
 import pymupdf
 from docx import Document
 from docx.table import Table
 from docx.text.paragraph import Paragraph
-from fastapi import UploadFile
 
 from app.services.errors import ServiceError
 
 MAX_TEXT = 2_000_000
 MAX_PAGES = 300
 MAX_UNPACKED = 50 * 1024 * 1024
+
+
+class UploadedDocument(Protocol):
+    name: str
+    content_type: str
+
+    def read(self, size: int = -1) -> bytes: ...
 
 
 @dataclass(frozen=True)
@@ -49,8 +56,8 @@ def validate_container(path: Path) -> None:
         raise ServiceError("DOCX inválido, com macros ou acima do limite de descompressão.", 422) from None
 
 
-def save_upload(upload: UploadFile, root: Path, max_bytes: int) -> tuple[Path, str]:
-    name = (upload.filename or "").strip()
+def save_upload(upload: UploadedDocument, root: Path, max_bytes: int) -> tuple[Path, str]:
+    name = (upload.name or "").strip()
     if not name or len(name) > 255 or any(c in name for c in '/\\:') or any(ord(c) < 32 for c in name):
         raise ServiceError("Nome de arquivo inválido.", 422)
     extension = Path(name).suffix.lower()
@@ -64,7 +71,7 @@ def save_upload(upload: UploadFile, root: Path, max_bytes: int) -> tuple[Path, s
     size = 0
     try:
         with path.open("xb") as output:
-            while data := upload.file.read(64 * 1024):
+            while data := upload.read(64 * 1024):
                 size += len(data)
                 if size > max_bytes:
                     raise ServiceError("Arquivo excede o tamanho máximo permitido.", 413)

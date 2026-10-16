@@ -9,13 +9,13 @@ class LLMService:
     def __init__(self, settings: Settings, client: httpx.Client):
         self.settings, self.client = settings, client
 
-    def complete(self, system: str, user: str) -> str:
+    def complete(self, system: str, user: str, *, max_tokens: int = 1500) -> str:
         if not self.settings.openrouter_api_key:
             raise ServiceError("Configure OPENROUTER_API_KEY para usar o assistente.", 503)
         payload = post_json(
             self.client, "OpenRouter", "https://openrouter.ai/api/v1/chat/completions",
             headers={"Authorization": f"Bearer {self.settings.openrouter_api_key}"},
-            json={"model": self.settings.openrouter_model, "temperature": 0, "max_tokens": 1500,
+            json={"model": self.settings.openrouter_model, "temperature": 0, "max_tokens": max_tokens,
                   "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]},
         )
         try:

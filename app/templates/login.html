@@ -1,0 +1,17 @@
+{% extends "learner_base.html" %}
+{% block title %}Entrar · Academia Carmel{% endblock %}
+{% block content %}
+<section class="login-card" aria-labelledby="login-title">
+  <span class="welcome-eyebrow">SEU ESPAÇO DE APRENDIZADO</span>
+  <h1 id="login-title">Acesse seus treinamentos.</h1>
+  <p>Entre com o usuário fornecido pela administração.</p>
+  {% if form.errors %}<p class="login-error" role="alert">Não foi possível entrar. Verifique seu usuário e senha.</p>{% endif %}
+  <form method="post">
+    {{ csrf_input }}
+    <input type="hidden" name="next" value="{{ next }}">
+    <label for="id_username">Usuário</label>{{ form.username }}
+    <label for="id_password">Senha</label>{{ form.password }}
+    <button type="submit">Entrar</button>
+  </form>
+</section>
+{% endblock %}

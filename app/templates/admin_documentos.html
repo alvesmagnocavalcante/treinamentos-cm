@@ -1,17 +1,18 @@
 {% extends "base.html" %}
 {% block title %}Documentos · {{ treinamento.titulo }}{% endblock %}
 {% block content %}
-<a href="/admin">← Cadastros</a>
+<a href="/admin/">← Administração</a>
 <h1 class="mt-3">Documentos</h1>
 <p>{{ treinamento.setor.nome }} · {{ treinamento.titulo }}</p>
 {% if erro %}<div class="alert alert-danger" role="alert">{{ erro }} Se o documento aparecer como pendente, corrija a causa e clique em Reindexar.</div>{% endif %}
-<form method="post" enctype="multipart/form-data" class="card card-body mb-4" data-upload-form>
+{% if pode_enviar %}<form method="post" enctype="multipart/form-data" class="card card-body mb-4" data-upload-form>
+  {{ csrf_input }}
   <label for="arquivo" class="form-label">Enviar PDF ou DOCX (até {{ max_upload_mb }} MB)</label>
   <input id="arquivo" name="arquivo" type="file" accept=".pdf,.docx" class="form-control" required>
   <p class="form-text">O texto será enviado ao Google para gerar embeddings. Envie apenas procedimentos internos autorizados.</p>
   <button class="btn btn-dark align-self-start" type="submit">Enviar e indexar</button>
   <p class="small mt-2 mb-0" data-upload-status role="status"></p>
-</form>
+</form>{% endif %}
 <div class="table-responsive">
 <table class="table align-middle">
   <thead><tr><th>Documento</th><th>Status</th><th>Ações</th></tr></thead>
@@ -19,14 +20,13 @@
   {% for documento in documentos %}
     <tr>
       <td>{{ documento.nome }}<br><small>ID {{ documento.id }} · {{ documento.criado_em.strftime('%d/%m/%Y %H:%M') }} UTC</small></td>
-      <td>{{ 'Indexado' if documento.processado else 'Pendente' }}</td>
+      <td>{% if not documento.arquivo_disponivel %}<span class="text-danger">Arquivo ausente — envie novamente</span>{% else %}{{ 'Indexado' if documento.processado else 'Pendente' }}{% endif %}</td>
       <td>
         <div class="d-flex flex-wrap gap-2">
-          {% if treinamento.ativo %}<a class="btn btn-sm btn-outline-secondary" href="/documentos/{{ documento.id }}/arquivo">Baixar</a>{% endif %}
-          <form method="post" action="/admin/documentos/{{ documento.id }}/reindexar"><button class="btn btn-sm btn-outline-dark">Reindexar</button></form>
-          <form method="post" action="/admin/documentos/{{ documento.id }}/excluir" data-delete-form><button class="btn btn-sm btn-outline-danger">Excluir</button></form>
+          {% if documento.arquivo_disponivel and treinamento.ativo %}<a class="btn btn-sm btn-outline-secondary" href="/documentos/{{ documento.id }}/arquivo">Baixar</a>{% endif %}
+          {% if pode_reindexar and documento.arquivo_disponivel %}<form method="post" action="/admin/documentos/{{ documento.id }}/reindexar">{{ csrf_input }}<button class="btn btn-sm btn-outline-dark">Reindexar</button></form>{% endif %}
+          {% if pode_excluir %}<form method="post" action="/admin/documentos/{{ documento.id }}/excluir" data-delete-form>{{ csrf_input }}<button class="btn btn-sm btn-outline-danger">Excluir</button></form>{% endif %}
         </div>
-        <details class="mt-2"><summary>Gerar roteiro com revisão humana</summary><p class="small mb-1">Execute no terminal interativo:</p><code>python -m pipeline.run --documento-id {{ documento.id }}</code></details>
       </td>
     </tr>
   {% else %}<tr><td colspan="3">Nenhum documento cadastrado.</td></tr>{% endfor %}
@@ -34,5 +34,5 @@
 </table>
 </div>
 {% if treinamento.ativo %}<a href="/treinamentos/{{ treinamento.id }}" class="btn btn-dark">Abrir treinamento e chat</a>{% endif %}
-<script src="{{ url_for('static', path='/documents.js') }}" defer></script>
+<script src="{{ static('documents.js') }}" defer></script>
 {% endblock %}

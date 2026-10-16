@@ -1,0 +1,21 @@
+[project]
+name = "treinamentos-cm"
+version = "0.1.0"
+description = "Plataforma interna de treinamentos com aulas, documentos e RAG"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "Django>=5.2,<5.3",
+    "Jinja2>=3.1.6,<4",
+    "python-dotenv==1.2.3",
+    "PyMuPDF>=1.25,<2",
+    "python-docx>=1.1,<2",
+    "chromadb>=1.0,<2",
+    "httpx>=0.28,<1",
+]
+
+[dependency-groups]
+dev = ["pytest>=8.3,<10", "pytest-django>=4.11,<5"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings"
+testpaths = ["tests"]

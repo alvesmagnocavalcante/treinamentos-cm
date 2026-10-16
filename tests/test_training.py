@@ -1,106 +1,163 @@
-import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
+import json
+import re
 
-from app.config import Settings
-from app.main import create_app
-from app.models import Documento, Setor, Treinamento
+import pytest
+from django.contrib.auth.models import Permission
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
+from django.db.models.deletion import ProtectedError
+from django.test import Client
+
+from app.models import Aula, Documento, Setor, Treinamento
+from app.services.rag import NOT_FOUND
+
+pytestmark = pytest.mark.django_db
 
 
 @pytest.fixture
-def client(tmp_path):
-    with TestClient(create_app(Settings(tmp_path / "training.sqlite3"))) as client:
-        yield client
+def training():
+    sector = Setor.objects.create(nome="Recepção")
+    return Treinamento.objects.create(setor=sector, titulo="Early Check-in")
 
 
-def create_training(client, **overrides):
-    client.post("/admin/setores", data={"nome": "Recepção"})
-    data = {"setor_id": 1, "titulo": "Early Check-in", "ativo": "true"}
-    return client.post("/admin/treinamentos", data=data | overrides, follow_redirects=False)
+def test_authentication_required(client, training):
+    assert client.get("/").status_code == 302
+    assert client.get(f"/treinamentos/{training.pk}").status_code == 302
+    assert client.get("/documentos/1/arquivo").status_code == 302
+    response = client.post(f"/treinamentos/{training.pk}/perguntar", data=json.dumps({"pergunta":"Teste"}), content_type="application/json")
+    assert response.status_code == 401
+    assert client.get("/conta/entrar/").status_code == 200
 
 
-def test_empty_pages_and_static(client):
-    assert "Nenhum setor cadastrado" in client.get("/").text
-    assert "Novo setor" in client.get("/admin").text
-    assert client.get("/static/app.css").status_code == 200
-
-
-def test_training_and_document_relationship(client):
-    response = create_training(client, conteudo="Consultar disponibilidade antes de confirmar.")
-    assert response.status_code == 303
-    assert response.headers["location"] == "/treinamentos/1"
-    assert "Early Check-in" in client.get("/").text
-    with client.app.state.session_factory() as session:
-        session.add(Documento(
-            treinamento_id=1, nome="POP_EARLY_CHECKIN.pdf",
-            caminho="media/documentos/test.pdf", tipo="pdf",
-        ))
-        session.commit()
-        documento = session.scalar(select(Documento))
-        assert documento.processado is False
-        assert documento.criado_em is not None
-        assert documento.treinamento.setor.nome == "Recepção"
-    page = client.get("/treinamentos/1")
+def test_employee_pages_and_admin_access(employee_client, training):
+    page = employee_client.get(f"/treinamentos/{training.pk}")
     assert page.status_code == 200
-    assert "Consultar disponibilidade" in page.text
-    assert "POP_EARLY_CHECKIN.pdf" in page.text
-    assert "Pendente de processamento" in page.text
-    assert "media/documentos/test.pdf" not in page.text
+    assert "Early Check-in" in page.content.decode()
+    assert 'href="/admin' not in page.content.decode()
+    assert "csrfmiddlewaretoken" in page.content.decode()
+    assert employee_client.get("/admin/").status_code == 302
+    assert employee_client.get(f"/admin/treinamentos/{training.pk}/documentos").status_code == 302
 
 
-@pytest.mark.parametrize("data", [{"nome": "   "}, {"nome": "a" * 101}, {}])
-def test_sector_validation(client, data):
-    assert client.post("/admin/setores", data=data).status_code == 422
+def test_admin_registered_models_and_forms(staff_client):
+    response = staff_client.get("/admin/")
+    assert response.status_code == 200
+    assert "Treinamentos" in response.content.decode()
+    assert staff_client.post("/admin/app/setor/add/", {"nome":"Recepção","descricao":"","_save":"Salvar"}).status_code == 302
+    assert Setor.objects.get().nome == "Recepção"
+    for model in ("setor","treinamento","aula","documento"):
+        assert staff_client.get(f"/admin/app/{model}/").status_code == 200
 
 
-def test_duplicate_sector(client):
-    assert client.post("/admin/setores", data={"nome": "Recepção"}).status_code == 200
-    assert client.post("/admin/setores", data={"nome": " Recepção "}).status_code == 409
+def test_multiple_lessons_keep_training_rag_scope(employee_client, training):
+    first = Aula.objects.create(treinamento=training, titulo="Introdução", ordem=1, conteudo="Explicação da primeira aula.")
+    second = Aula.objects.create(treinamento=training, titulo="Disponibilidade", ordem=2, video_url="https://drive.google.com/file/d/video-two/view")
+    hidden = Aula.objects.create(treinamento=training, titulo="Rascunho confidencial", ordem=3, ativo=False)
+    page = employee_client.get(f"/treinamentos/{training.pk}")
+    assert page.status_code == 200
+    assert "Explicação da primeira aula." in page.content.decode()
+    assert "Aulas do treinamento" in page.content.decode()
+    assert hidden.titulo not in page.content.decode()
+    page = employee_client.get(f"/treinamentos/{training.pk}?aula={second.pk}")
+    assert 'src="https://drive.google.com/file/d/video-two/preview"' in page.content.decode()
+    assert "Explicação da primeira aula." not in page.content.decode()
+    assert employee_client.get(f"/treinamentos/{training.pk}?aula={hidden.pk}").status_code == 404
+    assert employee_client.get(f"/treinamentos/{training.pk}?aula=bad").status_code == 404
+    other = Treinamento.objects.create(setor=training.setor, titulo="Outro")
+    foreign = Aula.objects.create(treinamento=other, titulo="Outra", ordem=1)
+    assert employee_client.get(f"/treinamentos/{training.pk}?aula={foreign.pk}").status_code == 404
+    result = employee_client.post(f"/treinamentos/{training.pk}/perguntar", {"pergunta":"Como proceder?"}, content_type="application/json")
+    assert result.json() == {"resposta":NOT_FOUND,"fontes":[]}
 
 
-@pytest.mark.parametrize("overrides, status", [
-    ({"setor_id": 999}, 404), ({"setor_id": -1}, 422),
-    ({"titulo": "  "}, 422), ({"titulo": "a" * 201}, 422),
-])
-def test_training_validation(client, overrides, status):
-    assert create_training(client, **overrides).status_code == status
+def test_inactive_and_missing_training(employee_client, training):
+    training.ativo = False
+    training.save()
+    assert "Early Check-in" not in employee_client.get("/").content.decode()
+    assert employee_client.get(f"/treinamentos/{training.pk}").status_code == 404
+    assert employee_client.get("/treinamentos/999").status_code == 404
 
 
-def test_inactive_and_missing_training(client):
-    create_training(client, ativo="false")
-    assert "Early Check-in" not in client.get("/").text
-    assert client.get("/treinamentos/1").status_code == 404
-    assert client.get("/treinamentos/999").status_code == 404
-
-
-def test_user_content_is_escaped(client):
-    create_training(client, titulo="<script>alert(1)</script>", conteudo="<img src=x onerror=alert(1)>")
-    page = client.get("/treinamentos/1").text
+def test_user_content_is_escaped(employee_client, training):
+    training.titulo = "<script>alert(1)</script>"
+    training.save()
+    Aula.objects.create(treinamento=training, titulo="Explicação", conteudo="<img src=x onerror=alert(1)>")
+    page = employee_client.get(f"/treinamentos/{training.pk}").content.decode()
     assert "<script>" not in page
     assert "<img src=x" not in page
     assert "&lt;script&gt;" in page
+    assert "&lt;img" in page
 
 
-def test_sqlite_constraints(client):
-    with client.app.state.session_factory() as session:
-        session.add(Treinamento(setor_id=999, titulo="Órfão"))
-        with pytest.raises(IntegrityError):
-            session.commit()
-        session.rollback()
-        session.add(Setor(nome="Recepção"))
-        session.flush()
-        training = Treinamento(setor_id=1, titulo="Check-in")
-        session.add(training)
-        session.flush()
-        session.add(Documento(treinamento_id=training.id, nome="file.exe", caminho="x", tipo="exe"))
-        with pytest.raises(IntegrityError):
-            session.commit()
+@pytest.mark.parametrize("name", ["", "   ", "a"*101])
+def test_sector_validation(name):
+    with pytest.raises(ValidationError):
+        Setor(nome=name).full_clean()
 
 
-def test_database_persists_across_restarts(tmp_path):
-    settings = Settings(tmp_path / "persistent.sqlite3")
-    with TestClient(create_app(settings)) as client:
-        create_training(client)
-    with TestClient(create_app(settings)) as client:
-        assert "Early Check-in" in client.get("/").text
+def test_lesson_validation_and_unique_order(training):
+    Aula.objects.create(treinamento=training,titulo="Introdução",ordem=1)
+    with pytest.raises(ValidationError):
+        Aula(treinamento=training,titulo="Duplicada",ordem=1).full_clean()
+    with pytest.raises(ValidationError):
+        Aula(treinamento=training,titulo="Inválida",ordem=0).full_clean()
+    with pytest.raises(ValidationError):
+        Aula(treinamento=training,titulo="Vídeo",ordem=2,video_url="javascript:alert(1)").full_clean()
+    with transaction.atomic(), pytest.raises(IntegrityError):
+        Aula.objects.create(treinamento=training,titulo="Duplicada",ordem=1)
+
+
+def test_parent_deletion_does_not_orphan_documents(training):
+    Documento.objects.create(treinamento=training,nome="POP.pdf",caminho="file.pdf",tipo="pdf")
+    with pytest.raises(ProtectedError):
+        training.delete()
+    with pytest.raises(ProtectedError):
+        training.setor.delete()
+
+
+def test_missing_original_is_not_exposed_or_used_in_rag(staff_client,training,platform_settings):
+    document = Documento.objects.create(treinamento=training,nome="Ausente.pdf",caminho="missing.pdf",tipo="pdf",processado=True)
+    page = staff_client.get(f"/treinamentos/{training.pk}").content.decode()
+    assert f'href="/documentos/{document.pk}/arquivo"' not in page
+    status = staff_client.get(f"/admin/treinamentos/{training.pk}/documentos").content.decode()
+    assert "Arquivo ausente" in status
+    response = staff_client.post(f"/treinamentos/{training.pk}/perguntar",{"pergunta":"Como proceder?"},content_type="application/json")
+    assert response.json() == {"resposta":NOT_FOUND,"fontes":[]}
+
+
+def test_staff_needs_explicit_document_permissions(client,django_user_model,training):
+    user = django_user_model.objects.create(username="staff_sem_permissao",is_staff=True)
+    client.force_login(user)
+    url = f"/admin/treinamentos/{training.pk}/documentos"
+    assert client.get(url).status_code == 403
+    user.user_permissions.add(Permission.objects.get(codename="view_documento"))
+    assert client.get(url).status_code == 200
+    assert client.post(url).status_code == 403
+
+
+def test_csrf_protects_chat_upload_logout(employee_client,training,django_user_model):
+    client = Client(enforce_csrf_checks=True)
+    client.force_login(django_user_model.objects.get(username="colaborador"))
+    url = f"/treinamentos/{training.pk}/perguntar"
+    assert client.post(url,{"pergunta":"Teste"},content_type="application/json").status_code == 403
+    page = client.get(f"/treinamentos/{training.pk}").content.decode()
+    token = re.search(r'name="csrfmiddlewaretoken" value="([^"]+)"',page).group(1)
+    assert client.post(url,{"pergunta":"Teste"},content_type="application/json",HTTP_X_CSRFTOKEN=token).status_code == 200
+    assert client.post(url,{"pergunta":"Teste"},content_type="application/json",HTTP_X_CSRFTOKEN=token,HTTP_ORIGIN="https://evil.example").status_code == 403
+    assert client.post("/conta/sair/").status_code == 403
+    assert client.get("/conta/sair/").status_code == 405
+
+
+def test_login_and_logout(client,django_user_model):
+    user = django_user_model.objects.create_user(username="teste_login", password="senha-ficticia-apenas-teste-123")
+    assert client.post("/conta/entrar/",{"username":user.username,"password":"errada"}).status_code == 200
+    assert "_auth_user_id" not in client.session
+    assert client.post("/conta/entrar/",{"username":user.username,"password":"senha-ficticia-apenas-teste-123","next":"https://evil.example"}).url == "/"
+    assert client.post("/conta/sair/").status_code == 302
+    assert "_auth_user_id" not in client.session
+
+
+@pytest.mark.parametrize("body",[{},{"pergunta":" "},{"pergunta":"a"*2001},{"pergunta":"ok","training_id":2},{"pergunta":1},[],None])
+def test_question_validation(employee_client,training,body):
+    response = employee_client.post(f"/treinamentos/{training.pk}/perguntar",data=json.dumps(body),content_type="application/json")
+    assert response.status_code == 422

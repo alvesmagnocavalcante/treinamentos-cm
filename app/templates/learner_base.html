@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block framework_styles %}{% endblock %}
+{% block body_class %}learner-page{% endblock %}
+{% block main_class %}learner-main{% endblock %}
+{% block navigation %}
+<a class="skip-link" href="#main-content">Ir para o conteúdo</a>
+<header class="learner-header">
+  <div class="learner-header-inner">
+    <a class="learner-brand" href="/" aria-label="Carmel — início dos treinamentos">
+      <span class="brand-mark">{{ icon('book', 22) }}</span>
+      <span class="brand-name">carmel<span class="brand-caption">ACADEMIA</span></span>
+    </a>
+    {% if request.user.is_authenticated %}<nav aria-label="Navegação principal">
+      <a class="header-nav-link" href="/">{{ icon('book', 17) }}<span>Meus treinamentos</span></a>
+    </nav>{% endif %}
+    <span class="header-signature">Conhecimento que acolhe.</span>
+    {% if request.user.is_authenticated %}<form action="{{ url('logout') }}" method="post" class="logout-form">{{ csrf_input }}<button type="submit">Sair</button></form>{% endif %}
+  </div>
+</header>
+{% endblock %}

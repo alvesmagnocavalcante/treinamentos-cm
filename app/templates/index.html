@@ -1,20 +1,25 @@
-{% extends "base.html" %}
+{% extends "learner_base.html" %}
+{% from "_icons.html" import icon %}
 {% block content %}
-<h1 class="mb-4">Treinamentos</h1>
+<div class="catalog-heading"><span class="welcome-eyebrow">CONHECIMENTO PARA O DIA A DIA</span><h1>Um novo aprendizado.<br>Um cuidado a mais.</h1><p>Explore os treinamentos, aprenda no seu ritmo e tire suas dúvidas.</p></div>
 {% for setor in setores %}
-<section class="mb-4">
-  <h2 class="h4">{{ setor.nome }}</h2>
-  <p>{{ setor.descricao }}</p>
-  <div class="list-group">
-    {% for treinamento in setor.treinamentos | selectattr('ativo') | sort(attribute='titulo') %}
-    <a class="list-group-item list-group-item-action" href="/treinamentos/{{ treinamento.id }}">
-      <strong>{{ treinamento.titulo }}</strong>
-      <span class="d-block text-muted">{{ treinamento.descricao }}</span>
+{% set active_trainings = setor.disponiveis %}
+<section class="catalog-section">
+  <div class="catalog-section-heading"><h2>{{ setor.nome }}</h2><span class="count-badge">{{ active_trainings | length }}</span></div>
+  {% if setor.descricao %}<p class="catalog-sector-description">{{ setor.descricao }}</p>{% endif %}
+  <div class="training-grid">
+    {% for treinamento in active_trainings %}
+    <a class="training-tile" href="/treinamentos/{{ treinamento.id }}">
+      <span class="tile-icon">{{ icon('play' if treinamento.tem_video else 'book', 23) }}</span>
+      <span class="tile-category">{{ setor.nome }}</span>
+      <h3>{{ treinamento.titulo }}</h3>
+      {% if treinamento.descricao %}<p>{{ treinamento.descricao }}</p>{% endif %}
+      <span class="tile-footer">Começar treinamento {{ icon('arrow-right', 18) }}</span>
     </a>
-    {% else %}<p class="text-muted">Nenhum treinamento ativo neste setor.</p>{% endfor %}
+    {% else %}<p class="catalog-empty">Nenhum treinamento ativo neste setor.</p>{% endfor %}
   </div>
 </section>
 {% else %}
-<p>Nenhum setor cadastrado. <a href="/admin">Cadastre um setor e seu primeiro treinamento.</a></p>
+<div class="catalog-empty"><span class="tile-icon">{{ icon('book', 24) }}</span><h2>Seus treinamentos estarão aqui.</h2><p>Nenhum setor cadastrado. Aguarde a disponibilização dos primeiros conteúdos.</p></div>
 {% endfor %}
 {% endblock %}

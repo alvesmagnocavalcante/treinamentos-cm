@@ -4,8 +4,6 @@ from zipfile import ZipFile
 import pymupdf
 import pytest
 from docx import Document
-from fastapi import UploadFile
-from starlette.datastructures import Headers
 
 from app.services.chunking import chunk_sections
 from app.services.errors import ServiceError
@@ -18,6 +16,13 @@ def pdf_bytes(text="DEMONSTRACAO FICTICIA. Consulte a disponibilidade para early
         pdf.new_page()
         pdf.new_page().insert_text((40, 50), text)
         return pdf.tobytes()
+
+
+def uploaded_file(data, name, mime):
+    upload = BytesIO(data)
+    upload.name = name
+    upload.content_type = mime
+    return upload
 
 
 def test_pdf_extraction_preserves_page(tmp_path):
@@ -75,7 +80,7 @@ def test_chunking_long_paragraph_without_spaces_and_page_isolation():
     ("file.pdf", "application/pdf", b"%PDF-" + b"x" * 100, 413),
 ])
 def test_invalid_upload_is_rejected_without_residue(tmp_path, name, mime, data, status):
-    upload = UploadFile(BytesIO(data), filename=name, headers=Headers({"content-type": mime}))
+    upload = uploaded_file(data, name, mime)
     with pytest.raises(ServiceError) as error:
         save_upload(upload, tmp_path, 100)
     assert error.value.status_code == status
@@ -83,7 +88,7 @@ def test_invalid_upload_is_rejected_without_residue(tmp_path, name, mime, data, 
 
 
 def test_upload_name_and_path_are_safe(tmp_path):
-    upload = UploadFile(BytesIO(pdf_bytes()), filename="POP_EARLY_CHECKIN.pdf", headers=Headers({"content-type": "application/pdf"}))
+    upload = uploaded_file(pdf_bytes(), "POP_EARLY_CHECKIN.pdf", "application/pdf")
     path, name = save_upload(upload, tmp_path, 100000)
     assert name == "POP_EARLY_CHECKIN.pdf"
     assert path.name != name

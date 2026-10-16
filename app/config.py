@@ -39,11 +39,11 @@ class Settings:
             return value if value.is_absolute() else ROOT / value
 
         model = os.getenv("OPENROUTER_MODEL", "openrouter/free").strip()
-        # O prefixo extra é usado pelo adaptador CrewAI, não pelo endpoint HTTP.
+        # Compatibilidade com IDs usados pelo antigo adaptador de agentes.
         if model.startswith("openrouter/") and "/" in model.removeprefix("openrouter/"):
             model = model.removeprefix("openrouter/")
         return cls(
-            database_path=path("DATABASE_PATH", "app/database/training.sqlite3"),
+            database_path=path("DJANGO_DATABASE_PATH", "app/database/platform.sqlite3"),
             documents_path=path("DOCUMENTS_PATH", "media/documentos"),
             vector_path=path("VECTOR_DB_PATH", "vector_db"),
             google_api_key=os.getenv("GOOGLE_API_KEY", "").strip(),

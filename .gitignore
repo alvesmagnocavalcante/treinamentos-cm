@@ -10,3 +10,4 @@ app/database/
 media/
 vector_db/
 .cache/
+staticfiles/
